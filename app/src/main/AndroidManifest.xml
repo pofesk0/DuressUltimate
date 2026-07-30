@@ -1,0 +1,62 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="duress.ultimate">
+	
+    <application
+		android:allowBackup="false"
+		android:debuggable="false"
+		android:persistent="true"
+		android:manageSpaceActivity=".MainActivity"
+		android:requestLegacyExternalStorage="false"
+        android:fullBackupContent="false"
+		android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"       
+		android:extractNativeLibs="false"
+		android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
+        android:label="DuressUltimate">
+	
+        <service
+            android:name=".MyAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"		
+			android:persistent="true"
+			android:stopWithTask="false"			
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_config"/>
+        </service>
+		
+        <activity
+			android:exported="true"			
+			android:launchMode="singleTask"
+			android:turnScreenOn="true"			
+			android:screenOrientation="portrait"
+			android:resizeableActivity="false"
+			android:excludeFromRecents="true"
+			android:name=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>		
+
+		<receiver		
+			android:name=".MyDeviceAdminReceiver"			
+			android:exported="true"			
+			android:process=":rec"
+			android:directBootAware="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+                <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />				
+            </intent-filter>			
+        </receiver>
+	
+    </application>
+</manifest>
