@@ -1,0 +1,31 @@
+plugins {
+id 'com.android.application'
+}
+
+android {
+namespace "duress.ultimate"
+compileSdk 34
+
+lint {
+checkReleaseBuilds false
+}
+
+defaultConfig {  
+    applicationId "duress.ultimate"  
+    minSdk 29
+    targetSdk 37
+    versionCode 1
+    versionName "1.0"  
+}  
+
+buildTypes {  
+    release {  
+        minifyEnabled false  
+        shrinkResources false  
+    }  
+}
+
+}
+
+dependencies {
+}
