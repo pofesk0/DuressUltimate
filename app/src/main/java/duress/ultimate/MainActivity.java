@@ -514,7 +514,7 @@ public class MainActivity extends Activity {
             byte[] hash = md.digest(pin.getBytes(StandardCharsets.UTF_8));
             return Base64.encodeToString(hash, Base64.NO_WRAP);
         } catch (Exception e) {
-            return "";
+            throw new RuntimeException(e);
         }
     }
 
