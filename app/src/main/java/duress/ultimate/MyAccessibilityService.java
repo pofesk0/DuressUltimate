@@ -3,8 +3,12 @@ package duress.ultimate;
 import android.accessibilityservice.AccessibilityService;
 import android.content.pm.ApplicationInfo;
 import android.content.ComponentName;
+import android.os.Bundle;
 import android.app.KeyguardManager;
 import android.os.UserManager;
+import android.graphics.Rect;
+import android.view.accessibility.AccessibilityWindowInfo;
+import java.util.List;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.app.admin.DevicePolicyManager;
@@ -17,6 +21,8 @@ import android.widget.Toast;
 public class MyAccessibilityService extends AccessibilityService {
 
     private int Y = 1337;
+
+    private int dexA=0;
 
     private boolean isComponentEnabled() {
         ComponentName componentName = new ComponentName(this, MyAccessibilityService.class);
@@ -51,10 +57,31 @@ public class MyAccessibilityService extends AccessibilityService {
         if (dpm == null || !dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class))) return;
         
         if (event == null) return;
-        CharSequence packageName = event.getPackageName();            
+        CharSequence packageName = event.getPackageName();   
+
+        if (event.getEventType() == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) {            
+            String className = String.valueOf(event.getClassName());        
+            if ("android.widget.Toast".equals(className)) {                 
+                if (packageName != null && isSystemApp(packageName.toString())) {                                                     
+                    final KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);            
+                    if (km != null && km.isKeyguardLocked()) {                                      
+                        setWipeLimit(1); 
+                        clearPasswordFields();
+                    }
+                }
+            } 
+        }               
         
-        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {            
+            if (!isSystemPasswordHiddenOrCovered()) {
+                if (dexA==1) {
+                   dexA=0;
+                   clearPasswordFields();
+                }
+                return;
+            }           
             setWipeLimit(1);
+            dexA=1;
             int S=dpm.getCurrentFailedPasswordAttempts();
             if (Y !=1337 && S > Y) {    
                 Y=S;
@@ -99,9 +126,7 @@ public class MyAccessibilityService extends AccessibilityService {
             if (node.isPassword()) {
                 CharSequence text = node.getText();
                 int length = (text != null) ? text.length() : 0;
-                
-                if (length > 0) {                    
-
+                                                    
                     //This is only preventive measures. 1–3 is what the system does not check when sending from the screen unlock password input field; it does not spend the attempt limit. Only sending a length of duressLen, which is greater than 3, spends it here.
                     if (length <= 3 || length == duressLen) {
                         setWipeLimit(1);                        
@@ -110,9 +135,7 @@ public class MyAccessibilityService extends AccessibilityService {
                         int X = 2 + Y;  
                         if (X > maxAttempts) X = 1; 
                         setWipeLimit(X);                        
-                    }
-                    
-                }
+                    }                                    
             }
             
             node.recycle();
@@ -159,4 +182,109 @@ public class MyAccessibilityService extends AccessibilityService {
     public void onInterrupt() {
         
     }
+    
+    private boolean isSystemPasswordHiddenOrCovered() {
+
+        List<AccessibilityWindowInfo> windows = getWindows();
+ 
+        if (windows == null || windows.isEmpty()) return true;
+ 
+        AccessibilityNodeInfo passwordNode = null;
+        int passwordWindowId = -1; 
+  
+        for (AccessibilityWindowInfo window : windows) {   
+            AccessibilityNodeInfo root = window.getRoot();    
+            if (root != null) {       
+                CharSequence pkgName = root.getPackageName();         
+                if (pkgName != null && isSystemApp(pkgName.toString())) {         
+                    passwordNode = findPasswordNode(root);         
+                    if (passwordNode != null) {             
+                        passwordWindowId = window.getId();            
+                        root.recycle();           
+                        break;         
+                    }        
+                }        
+                root.recycle();     
+            }
+        }
+   
+        if (passwordNode == null) {  
+            return true;
+        }
+
+        Rect passwordBounds = new Rect(); 
+        passwordNode.getBoundsInScreen(passwordBounds);
+        passwordNode.recycle();
+ 
+        int passwordArea = passwordBounds.width() * passwordBounds.height();
+ 
+        if (passwordArea <= 0) return true;
+
+        for (AccessibilityWindowInfo window : windows) {  
+            if (window.getId() == passwordWindowId) {    
+                break;  
+            }  
+            Rect windowBounds = new Rect(); 
+            window.getBoundsInScreen(windowBounds);   
+            Rect intersection = new Rect();   
+            if (intersection.setIntersect(passwordBounds, windowBounds)) {      
+                int intersectionArea = intersection.width() * intersection.height();     
+                double coveredPercent = (double) intersectionArea / passwordArea;                   
+                if (coveredPercent >= 0.7) {         
+                    return true;       
+                }    
+            } 
+        }   
+        return false;
+    }
+
+
+    private AccessibilityNodeInfo findPasswordNode(AccessibilityNodeInfo node) {   
+        if (node == null) return null;   
+        if (node.isPassword()) {   
+            return node;  
+        }  
+        for (int i = 0; i < node.getChildCount(); i++) { 
+            AccessibilityNodeInfo child = node.getChild(i); 
+            if (child != null) {           
+                AccessibilityNodeInfo found = findPasswordNode(child);          
+                if (found != null) {               
+                    return found;            
+                }                      
+                child.recycle();            
+            }    
+        }   
+        return null;
+    }
+
+    private void clearPasswordFields() {
+        try {
+        AccessibilityNodeInfo rootNode = getRootInActiveWindow();
+        if (rootNode == null) return;
+        clearPasswordFieldsRecursive(rootNode);
+        rootNode.recycle();
+        } catch (Throwable e) {}
+    }
+
+    private void clearPasswordFieldsRecursive(AccessibilityNodeInfo node) {
+        if (node == null) return;
+        
+        if (node.isPassword() && node.isEditable()) {
+            CharSequence pkg = node.getPackageName();
+            if (pkg != null && isSystemApp(pkg.toString())) {               
+            Bundle arguments = new Bundle();
+            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "");
+            node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+            }
+        }
+        
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) {
+                clearPasswordFieldsRecursive(child);
+                child.recycle();
+            }
+        }
+    }
+
 }
