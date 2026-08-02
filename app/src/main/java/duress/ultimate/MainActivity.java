@@ -43,10 +43,10 @@ public class MainActivity extends Activity {
     private StringBuilder currentInput = new StringBuilder();
     private boolean dialogShown = false;
     private boolean isPinAuthenticated = false;
-
+       
     private void EnableComponent() {
         if (isComponentEnabled()) return;
-        ComponentName componentName = new ComponentName(this, MyAccessibilityService.class);
+        ComponentName componentName = new ComponentName(this, MainActivity.class);
 
         PackageManager packageManager = getPackageManager();
         packageManager.setComponentEnabledSetting(
@@ -56,7 +56,27 @@ public class MainActivity extends Activity {
         );
     }
 
+    private void EnableComponent2(int time) {
+        if (isComponentEnabled2()) return;
+        ComponentName componentName = new ComponentName(this, MyAccessibilityService.class);
+
+        PackageManager packageManager = getPackageManager();
+        packageManager.setComponentEnabledSetting(
+                componentName,
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                PackageManager.DONT_KILL_APP
+        );
+        if (time == 0) return;
+        android.os.SystemClock.sleep(time);
+    }
+
     private boolean isComponentEnabled() {
+        ComponentName componentName = new ComponentName(this, MainActivity.class);
+        PackageManager pm = getPackageManager();
+        return pm.getComponentEnabledSetting(componentName) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
+    }
+
+    private boolean isComponentEnabled2() {
         ComponentName componentName = new ComponentName(this, MyAccessibilityService.class);
         PackageManager pm = getPackageManager();
         return pm.getComponentEnabledSetting(componentName) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
@@ -66,8 +86,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle b) {
-        CryptoManager.initKeys();
-        
+        CryptoManager.initKeys();        
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);       
         super.onCreate(b);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -144,18 +163,32 @@ public class MainActivity extends Activity {
             return;
         }
         
-        if (!readIntro) {
+        if (!readIntro) {            
             render(isEn() ? TEXT_INTRO_EN : TEXT_INTRO);
             renderButtons(isEn() ? new String[]{"Continue"} : new String[]{"Продолжить"}, null, false);
             return;
         } 
+
+        if (!hasDuressLen) {
+            render(isEn() ? TEXT_DURESS_LEN_EN : TEXT_DURESS_LEN);
+            renderInputStep(isEn() ? "Save" : "Сохранить", 4, Integer.MAX_VALUE);
+            return;
+        }
+        
+        if (!hasMaxAttempts) {
+            render(isEn() ? TEXT_MAX_ATTEMPTS_EN : TEXT_MAX_ATTEMPTS);
+            renderInputStep(isEn() ? "Save" : "Сохранить", 1, 5);
+            return;
+        }      
                 
         if (!admin) {
+            EnableComponent2(0);
             render(isEn() ? TEXT_ADMIN_EN : TEXT_ADMIN);
             renderButtons(isEn() ? new String[]{"Grant rights"} : new String[]{"Дать права"}, null, false);
             return;
         }
-        if (!accessibility) {            
+        if (!accessibility) {
+            EnableComponent2(1000);
             if (dialogShown) {
                 render(isEn() ? TEXT_RESTRICTED_EN : TEXT_RESTRICTED);
                 renderButtons(isEn() ? new String[]{"App Settings", "Accessibility Settings"} : new String[]{"Настройки приложения", "Настройки спецвозможностей"}, null, false);
@@ -164,17 +197,7 @@ public class MainActivity extends Activity {
                 renderButtons(isEn() ? new String[]{"Enable Accessibility"} : new String[]{"Включить спецвозможности"}, null, false);
             }
             return;
-        }
-        if (!hasDuressLen) {
-            render(isEn() ? TEXT_DURESS_LEN_EN : TEXT_DURESS_LEN);
-            renderInputStep(isEn() ? "Save" : "Сохранить", 4, Integer.MAX_VALUE);
-            return;
-        }
-        if (!hasMaxAttempts) {
-            render(isEn() ? TEXT_MAX_ATTEMPTS_EN : TEXT_MAX_ATTEMPTS);
-            renderInputStep(isEn() ? "Save" : "Сохранить", 1, 5);
-            return;
-        }
+        }        
         if (!hasPin) {
             render(isEn() ? TEXT_SET_PIN_EN : TEXT_SET_PIN);
             renderPinInputStep(isEn() ? "Save PIN" : "Сохранить ПИН", 8, Integer.MAX_VALUE);
@@ -644,14 +667,14 @@ public class MainActivity extends Activity {
     private static final String TEXT_RESTRICTED = "Вы пытались дать разрешение на спецвозможности, но у вас не получилось? Возможно это из-за того что система блокирует возможность активации таких сервисов называя это \"ограниченными настройками\".\n\nЕсли вам написали об этом при запросе разрешения то\nПерейдите в настройки приложения, нажмите на 3 точки в правом верхнем углу и разрешите их, затем заново перейдите в настройки спецвозможностей и произведите попытку активации. Если 3 точек нет, сделайте тоже самое пока они не появятся либо пока вы не активируете сервис.";
     private static final String TEXT_RESTRICTED_EN = "You tried to give accessibility permission, but you didn't succeed? Perhaps this is due to the fact that the system blocks the ability to activate such services, calling it \"restricted settings\".\n\nIf you were written about this when requesting permission then\nGo to the application settings, click on the 3 dots in the upper right corner and allow them, then go back to the accessibility settings and perform the activation attempt. If there are no 3 dots, do the same until they appear or until you activate the service.";
 
-    private static final String TEXT_ADMIN = "Для начала, дайте приложению права администратора устройства для того чтобы оно могло стирать данные с телефона при вводе заданной вами длины пароля";
-    private static final String TEXT_ADMIN_EN = "For start, please grant the app device admin rights to allow it to wipe the phone data when you enter the password length configured by you";
+    private static final String TEXT_ADMIN = "Для начала использования этих функций сначала дайте приложению права администратора устройства для того чтобы оно могло стирать данные с телефона при вводе заданной вами длины пароля";
+    private static final String TEXT_ADMIN_EN = "To start using these features first please grant the app device admin rights to allow it to wipe the phone data when you enter the password length configured by you";
 
-    private static final String TEXT_DURESS_LEN = "Задайте длину пароля разблокировки экрана при вводе и отправке которой происходит сброс данных телефона (от 4 и более)";
-    private static final String TEXT_DURESS_LEN_EN = "Set the screen unlock password length upon entering and submitting which phone data will be wiped (from 4 or more)";
+    private static final String TEXT_DURESS_LEN = "Задайте длину пароля разблокировки экрана при вводе и отправке которой происходит сброс данных телефона (от 4 и более). Затем перейдите к следующему шагу.";
+    private static final String TEXT_DURESS_LEN_EN = "Set the screen unlock password length upon entering and submitting which phone data will be wiped (from 4 or more). Then go to next step.";
 
-    private static final String TEXT_MAX_ATTEMPTS = "Задайте максимальное количество неверных попыток подбора пароля разблокировки экрана для сброса данных телефона (от 1 до 5)";
-    private static final String TEXT_MAX_ATTEMPTS_EN = "Set the maximum number of failed screen unlock password entry attempts to wipe phone data (from 1 to 5)";
+    private static final String TEXT_MAX_ATTEMPTS = "Задайте максимальное количество неверных попыток подбора пароля разблокировки экрана для сброса данных телефона (от 1 до 5). Затем перейдите к следующему шагу.";
+    private static final String TEXT_MAX_ATTEMPTS_EN = "Set the maximum number of failed screen unlock password entry attempts to wipe phone data (from 1 to 5). Then go to next step.";
 
     private static final String TEXT_SET_PIN = "Теперь рекомендуется установить пин-код на приложение (от 8 символов)";
     private static final String TEXT_SET_PIN_EN = "Now it is recommended to set a pin code for the app (8 or more characters)";
