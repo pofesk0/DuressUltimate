@@ -4,7 +4,7 @@
     <application
 		android:allowBackup="false"
 		android:debuggable="false"
-		android:persistent="true"
+		android:persistent="true"		
 		android:manageSpaceActivity=".MainActivity"
 		android:requestLegacyExternalStorage="false"
         android:fullBackupContent="false"
@@ -19,6 +19,7 @@
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="true"		
 			android:persistent="true"
+			android:enabled="false"
 			android:stopWithTask="false"			
             android:directBootAware="true">
             <intent-filter>
