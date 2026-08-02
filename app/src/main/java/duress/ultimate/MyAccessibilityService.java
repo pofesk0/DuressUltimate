@@ -25,7 +25,7 @@ public class MyAccessibilityService extends AccessibilityService {
     private int dexA=0;
 
     private boolean isComponentEnabled() {
-        ComponentName componentName = new ComponentName(this, MyAccessibilityService.class);
+        ComponentName componentName = new ComponentName(this, MainActivity.class);
         PackageManager pm = getPackageManager();
         return pm.getComponentEnabledSetting(componentName) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
     }
@@ -114,13 +114,9 @@ public class MyAccessibilityService extends AccessibilityService {
                 duressLen = 4;
             }
             
-            int maxAttempts = CryptoManager.getInt(prefs, CryptoManager.BFU_ALIAS, "max_attempts", 0);
-            if (maxAttempts < 1 || maxAttempts > 5) {               
-                if (isComponentEnabled()) {             
-                    maxAttempts = 1;            
-                } else {
-                    maxAttempts = 3;                    
-                }
+            int maxAttempts = CryptoManager.getInt(prefs, CryptoManager.BFU_ALIAS, "max_attempts", 1);
+            if (maxAttempts < 1 || maxAttempts > 5) {                                       
+                    maxAttempts = 1;                            
             }                        
             
             if (node.isPassword()) {
@@ -184,22 +180,21 @@ public class MyAccessibilityService extends AccessibilityService {
     }
     
     private boolean isSystemPasswordHiddenOrCovered() {
-
         List<AccessibilityWindowInfo> windows = getWindows();
- 
         if (windows == null || windows.isEmpty()) return true;
- 
-        AccessibilityNodeInfo passwordNode = null;
-        int passwordWindowId = -1; 
+
+        Rect passwordBounds = null;
+        int passwordWindowIndex = -1; 
   
-        for (AccessibilityWindowInfo window : windows) {   
+        for (int i = 0; i < windows.size(); i++) {   
+            AccessibilityWindowInfo window = windows.get(i);
             AccessibilityNodeInfo root = window.getRoot();    
             if (root != null) {       
                 CharSequence pkgName = root.getPackageName();         
                 if (pkgName != null && isSystemApp(pkgName.toString())) {         
-                    passwordNode = findPasswordNode(root);         
-                    if (passwordNode != null) {             
-                        passwordWindowId = window.getId();            
+                    passwordBounds = findPasswordBounds(root);         
+                    if (passwordBounds != null) {             
+                        passwordWindowIndex = i;
                         root.recycle();           
                         break;         
                     }        
@@ -208,54 +203,63 @@ public class MyAccessibilityService extends AccessibilityService {
             }
         }
    
-        if (passwordNode == null) {  
-            return true;
+        boolean isCovered = false;
+
+        if (passwordBounds == null) {  
+            isCovered = true;
+        } else {
+            int passwordArea = passwordBounds.width() * passwordBounds.height();
+            
+            if (passwordArea <= 0) {
+                isCovered = true;
+            } else {
+                for (int i = passwordWindowIndex + 1; i < windows.size(); i++) {  
+                    AccessibilityWindowInfo window = windows.get(i);
+                    Rect windowBounds = new Rect(); 
+                    window.getBoundsInScreen(windowBounds);   
+                    
+                    Rect intersection = new Rect();   
+                    if (intersection.setIntersect(passwordBounds, windowBounds)) {      
+                        int intersectionArea = intersection.width() * intersection.height();     
+                        double coveredPercent = (double) intersectionArea / passwordArea;                   
+                        if (coveredPercent >= 0.7) {         
+                            isCovered = true;
+                            break; 
+                        }    
+                    } 
+                }
+            }
         }
 
-        Rect passwordBounds = new Rect(); 
-        passwordNode.getBoundsInScreen(passwordBounds);
-        passwordNode.recycle();
- 
-        int passwordArea = passwordBounds.width() * passwordBounds.height();
- 
-        if (passwordArea <= 0) return true;
+        for (AccessibilityWindowInfo window : windows) {
+            window.recycle();
+        }
 
-        for (AccessibilityWindowInfo window : windows) {  
-            if (window.getId() == passwordWindowId) {    
-                break;  
-            }  
-            Rect windowBounds = new Rect(); 
-            window.getBoundsInScreen(windowBounds);   
-            Rect intersection = new Rect();   
-            if (intersection.setIntersect(passwordBounds, windowBounds)) {      
-                int intersectionArea = intersection.width() * intersection.height();     
-                double coveredPercent = (double) intersectionArea / passwordArea;                   
-                if (coveredPercent >= 0.7) {         
-                    return true;       
-                }    
-            } 
-        }   
-        return false;
+        return isCovered;
     }
 
-
-    private AccessibilityNodeInfo findPasswordNode(AccessibilityNodeInfo node) {   
+    private Rect findPasswordBounds(AccessibilityNodeInfo node) {   
         if (node == null) return null;   
+        
         if (node.isPassword()) {   
-            return node;  
+            Rect bounds = new Rect();
+            node.getBoundsInScreen(bounds);
+            return bounds;  
         }  
+        
         for (int i = 0; i < node.getChildCount(); i++) { 
             AccessibilityNodeInfo child = node.getChild(i); 
             if (child != null) {           
-                AccessibilityNodeInfo found = findPasswordNode(child);          
-                if (found != null) {               
-                    return found;            
+                Rect foundBounds = findPasswordBounds(child);          
+                child.recycle();
+                if (foundBounds != null) {               
+                    return foundBounds;            
                 }                      
-                child.recycle();            
             }    
         }   
         return null;
     }
+
 
     private void clearPasswordFields() {
         try {
