@@ -8,7 +8,7 @@ Thus, this Fail-Safe protection is harder to bypass in Safe Mode or in case of a
 
 It increases this limit only temporarily (up to your configured value 1–5) when entering any code with a length different from the length for reset
 
-Length for reset can be not only longer, but also shorter than your password, because data will be wiped exactly after submitting a code, not only after input
+Length for reset can be not only longer, but also shorter than your password length, because data will be wiped precisely after submitting the code, not right after its input
 
 ​A code with this length must simply be different from your password for the data wipe to be performed
 
