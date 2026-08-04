@@ -16,7 +16,6 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
-import android.widget.Toast;
 
 public class MyAccessibilityService extends AccessibilityService {
 
@@ -123,9 +122,10 @@ public class MyAccessibilityService extends AccessibilityService {
                 CharSequence text = node.getText();
                 int length = (text != null) ? text.length() : 0;
                                                     
-                    //This is only preventive measures. 1–3 is what the system does not check when sending from the screen unlock password input field; it does not spend the attempt limit. Only sending a length of duressLen, which is greater than 3, spends it here.
-                    if (length <= 3 || length == duressLen) {
-                        setWipeLimit(1);                        
+                    //This is only preventive measures. 0–3 is what the system does not check when sending from the screen unlock password input field; it does not spend the attempt limit. Only sending a length of duressLen, which is greater than 3, spends it here.
+                    if (length <= 3 || length == duressLen) {                        
+                        setWipeLimit(1);
+                        dexA=0;
                     } else {                        
                         Y = dpm.getCurrentFailedPasswordAttempts();
                         int X = 2 + Y;  
@@ -276,9 +276,12 @@ public class MyAccessibilityService extends AccessibilityService {
         if (node.isPassword() && node.isEditable()) {
             CharSequence pkg = node.getPackageName();
             if (pkg != null && isSystemApp(pkg.toString())) {               
-            Bundle arguments = new Bundle();
-            arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "");
-            node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+                CharSequence text = node.getText();
+                if (text != null && text.length() >= 4) {
+                    Bundle arguments = new Bundle();
+                    arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "");
+                    node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+                }
             }
         }
         
