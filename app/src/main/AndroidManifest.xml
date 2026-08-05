@@ -3,8 +3,7 @@
 	
     <application
 		android:allowBackup="false"
-		android:debuggable="false"
-		android:persistent="true"		
+		android:debuggable="false"				
 		android:manageSpaceActivity=".MainActivity"
 		android:requestLegacyExternalStorage="false"
         android:fullBackupContent="false"
@@ -17,8 +16,7 @@
         <service
             android:name=".MyAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true"		
-			android:persistent="true"
+            android:exported="true"			
 			android:enabled="false"
 			android:stopWithTask="false"			
             android:directBootAware="true">
