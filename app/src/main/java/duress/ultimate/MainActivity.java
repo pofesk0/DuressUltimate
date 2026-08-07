@@ -13,6 +13,9 @@ import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
+import android.content.IntentFilter;
+import android.content.BroadcastReceiver;
 import android.provider.Settings;
 import android.util.Base64;
 import android.view.Gravity;
@@ -46,6 +49,32 @@ public class MainActivity extends Activity {
     private StringBuilder currentInput = new StringBuilder();
     private boolean dialogShown = false;
     private boolean isPinAuthenticated = false;
+
+	private BroadcastReceiver screenOffReceiver;
+
+	private void registerScreenOffReceiver() {
+    screenOffReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) {
+                EntryActivity.isLogged = false;
+				finishAndRemoveTask();
+            }
+        }
+    };
+    
+	IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
+    if (Build.VERSION.SDK_INT >= 33) {
+        registerReceiver(screenOffReceiver, filter, RECEIVER_NOT_EXPORTED);
+    } else {
+        registerReceiver(screenOffReceiver, filter);
+    } }
+
+	private void unregisterScreenOffReceiver() {
+    if (screenOffReceiver != null) {
+        unregisterReceiver(screenOffReceiver);
+        screenOffReceiver = null;
+    } }
        
     private void EnableComponent() {
         if (isComponentEnabled()) return;
@@ -101,6 +130,7 @@ public class MainActivity extends Activity {
             finishAndRemoveTask();
 			return;
         }
+		registerScreenOffReceiver();
         CryptoManager.initKeys();        
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -674,6 +704,7 @@ public class MainActivity extends Activity {
 	protected void onDestroy() {
 		EntryActivity.isLogged = false;
 		isPinAuthenticated = false;
+		unregisterScreenOffReceiver();
         super.onDestroy();		
     }
 
