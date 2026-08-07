@@ -1,6 +1,6 @@
 # DuressUltimate (Duress Ultimate)
 
-An emergency app that wipes phone data when you enter and submit any code with your configured length for reset instead of a password on the lock screen
+An emergency preparedness app that wipes phone data when you enter and submit any code with your configured length for reset instead of a password on the lock screen
 
 This app has the following advantages:
 
