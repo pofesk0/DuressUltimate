@@ -1,6 +1,9 @@
 package duress.ultimate;
 
 import android.app.Activity;
+import android.app.KeyguardManager;
+import android.content.Context;
+import android.os.UserManager;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -85,10 +88,20 @@ public class MainActivity extends Activity {
     private boolean isEn() { return !Locale.getDefault().getLanguage().equals("ru"); }
 
     @Override
-    protected void onCreate(Bundle b) {
-        CryptoManager.initKeys();        
+    protected void onCreate(Bundle b) {		
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);       
         super.onCreate(b);
+		if (!EntryActivity.isLogged) {
+			finishAndRemoveTask();
+			return;
+		}
+		UserManager um = (UserManager) getSystemService(Context.USER_SERVICE);
+        KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+        if (um == null || km == null || !um.isUserUnlocked() || km.isKeyguardLocked()) {
+            finishAndRemoveTask();
+			return;
+        }
+        CryptoManager.initKeys();        
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         ScrollView scrollView = new ScrollView(this);
@@ -128,6 +141,16 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+		if (!EntryActivity.isLogged) {
+			finishAndRemoveTask();
+			return;
+		}
+		UserManager um = (UserManager) getSystemService(Context.USER_SERVICE);
+        KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+        if (um == null || km == null || !um.isUserUnlocked() || km.isKeyguardLocked()) {
+            finishAndRemoveTask();
+			return;
+        }
         hideSystemUI();
         if (isPinAuthenticated) {
             updateUI();
@@ -645,6 +668,13 @@ public class MainActivity extends Activity {
     private boolean isAdmin() {
         DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(DEVICE_POLICY_SERVICE);
         return dpm != null && dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class));
+    }
+
+    @Override
+	protected void onDestroy() {
+		EntryActivity.isLogged = false;
+		isPinAuthenticated = false;
+        super.onDestroy();		
     }
 
     private static final String TEXT_INTRO = "Привет, это приложение DuressUltimate.\nОно создано для защиты ваших данных путем их удаления в экстренной ситауции, которая может возникнуть в жизни любого.\nВ отличии от других подобных приложений, это продолжит предоставлять зашиту даже если его сервис спецвозможностей будет остановлен, но хоть раз был запущен, так как оно работает в режиме Fail-Safe.\n\nВ этом приложении вы можете задать длину пароля разблокировки экрана при вводе и отправке которой ваши данные будут удалены, при этом эта длина может быть как больше, так и меньше вашего обычного пароля и разумеется вам даже не нужно включать отображение символов. Например ваш основной пароль состоит из 10 символов, тогда вы задаете длину для сброса в 4 символа, чтобы точно не перепутать с основным паролем и не допустить опечатку. К тому же если длина сброса короче вашего основого пароля вам легче быстро стиреть данные в экстренной ситауции. Например, вы вводите и отправляете эту длину сброса когда вас принуждают ввести пароль, чтобы безвозвратно удалить данные и не дать злоумышленникам дальше давить на вас.\n\nКак это работает:\nприложение превентивно задает минимальный лимит попыток ввода пароля разблокировки экрана после которых все данные телефона будут удалены. Он равен 1-му. Когда вы вводите пароль который длиннее или короче лимита, оно временно дает вам дополнительные 2 попытки, что является одним правом на ошибку (когда у вас 1 попытка у вас 0 прав на ошибку). И при следующем вводе дает вам ещё одну, но не более сумарного числа попыток, которые вы можете настроить в приложении в рамках диапазона от 1 до 5. Например если 5, то у вас 4 права на ошибку.\n\nЕсли приложение будет остановлено системой без лишения прав администратора или обойдено через безопасный режим, то оно просто оставит свой предыдущий лимит и не увеличит его, так что любая ошибка станет фатальной.\n\nПоэтому приложение дает максимальный шанс сброса данных в экстренной ситуации, ведь в случае сбоя, оно не перестанет давать гарантию сброса данных, а просто увеличит шанс случайного сброса данных вами.\n\nПроще говоря, лучше потерять данные, чем чтобы они достались злоумышленникам, и приложение будет обеспечивать гарантию этого любой ценой";
