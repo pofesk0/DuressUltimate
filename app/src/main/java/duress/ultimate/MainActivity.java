@@ -58,6 +58,7 @@ public class MainActivity extends Activity {
         public void onReceive(Context context, Intent intent) {
             if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) {
                 EntryActivity.isLogged = false;
+				isPinAuthenticated = false;
 				finishAndRemoveTask();
             }
         }
