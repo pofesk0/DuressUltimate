@@ -10,11 +10,11 @@ public class EntryActivity extends Activity {
     static boolean isLogged=true;
 	
     @Override
-    protected void onCreate(Bundle b) {
-        super.onCreate(b);       
+    protected void onCreate(Bundle b) {		
+        super.onCreate(b);      
+		isLogged=false;
 		KeyguardManager keyguardManager = (KeyguardManager) getSystemService(KEYGUARD_SERVICE);
-        if (keyguardManager.isKeyguardSecure()) {
-		isLogged=false;	
+        if (keyguardManager.isKeyguardSecure()) {		
         Intent intent = keyguardManager.createConfirmDeviceCredentialIntent(null, null);         
         startActivityForResult(intent, 1337);        
         } else {
