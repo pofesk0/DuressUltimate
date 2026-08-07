@@ -4,7 +4,7 @@
     <application
 		android:allowBackup="false"
 		android:debuggable="false"				
-		android:manageSpaceActivity=".MainActivity"
+		android:manageSpaceActivity=".EntryActivity"
 		android:requestLegacyExternalStorage="false"
         android:fullBackupContent="false"
 		android:icon="@mipmap/ic_launcher"
@@ -35,11 +35,21 @@
 			android:screenOrientation="portrait"
 			android:resizeableActivity="false"
 			android:excludeFromRecents="true"
-			android:name=".MainActivity">
+			android:name=".EntryActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+        </activity>
+
+		<activity
+			android:exported="false"			
+			android:launchMode="singleTask"
+			android:turnScreenOn="true"			
+			android:screenOrientation="portrait"
+			android:resizeableActivity="false"
+			android:excludeFromRecents="true"
+			android:name=".MainActivity">            
         </activity>		
 
 		<receiver		
