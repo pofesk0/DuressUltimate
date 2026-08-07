@@ -121,6 +121,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle b) {		
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);       
         super.onCreate(b);
+		isPinAuthenticated = false;
 		if (!EntryActivity.isLogged) {
 			finishAndRemoveTask();
 			return;
