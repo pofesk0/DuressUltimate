@@ -38,9 +38,8 @@ class CryptoManager {
                         .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                         .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE);
                 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    builder.setUnlockedDeviceRequired(true);
-                }
+                builder.setUnlockedDeviceRequired(true);
+                
                 keyGenerator.init(builder.build());
                 keyGenerator.generateKey();
             }
@@ -80,7 +79,7 @@ class CryptoManager {
 
     static void putInt(SharedPreferences prefs, String alias, String key, int value) {
         String encrypted = encrypt(alias, String.valueOf(value));
-        if (encrypted != null) prefs.edit().putString(key, encrypted).apply();
+        if (encrypted != null) prefs.edit().putString(key, encrypted).commit();
     }
 
     static int getInt(SharedPreferences prefs, String alias, String key, int defValue) {
@@ -93,7 +92,7 @@ class CryptoManager {
 
     static void putBoolean(SharedPreferences prefs, String alias, String key, boolean value) {
         String encrypted = encrypt(alias, String.valueOf(value));
-        if (encrypted != null) prefs.edit().putString(key, encrypted).apply();
+        if (encrypted != null) prefs.edit().putString(key, encrypted).commit();
     }
 
     static boolean getBoolean(SharedPreferences prefs, String alias, String key, boolean defValue) {
@@ -106,7 +105,7 @@ class CryptoManager {
 
     static void putString(SharedPreferences prefs, String alias, String key, String value) {
         String encrypted = encrypt(alias, value);
-        if (encrypted != null) prefs.edit().putString(key, encrypted).apply();
+        if (encrypted != null) prefs.edit().putString(key, encrypted).commit();
     }
 
     static String getString(SharedPreferences prefs, String alias, String key, String defValue) {
