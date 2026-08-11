@@ -237,7 +237,7 @@ public class MainActivity extends Activity {
         }      
                 
         if (!admin) {
-            EnableComponent2(0);
+            EnableComponent2(500);
             render(isEn() ? TEXT_ADMIN_EN : TEXT_ADMIN);
             renderButtons(isEn() ? new String[]{"Grant rights"} : new String[]{"Дать права"}, null, false);
             return;
