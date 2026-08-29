@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="duress.ultimate">
+
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" /> 		
 	
     <application
 		android:allowBackup="false"
@@ -15,9 +18,10 @@
 	
         <service
             android:name=".MyAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true"			
-			android:enabled="false"
+            android:foregroundServiceType="systemExempted"          			
+			android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"		
+			android:enabled="true"
 			android:stopWithTask="false"			
             android:directBootAware="true">
             <intent-filter>
@@ -30,7 +34,7 @@
 		
         <activity
 			android:exported="true"			
-			android:launchMode="singleTask"
+			android:launchMode="singleInstance"
 			android:turnScreenOn="true"			
 			android:screenOrientation="portrait"
 			android:resizeableActivity="false"
@@ -54,7 +58,7 @@
 
 		<receiver		
 			android:name=".MyDeviceAdminReceiver"			
-			android:exported="true"			
+			android:exported="true"		
 			android:process=":rec"
 			android:directBootAware="true"
             android:permission="android.permission.BIND_DEVICE_ADMIN">
@@ -63,9 +67,9 @@
                 android:resource="@xml/device_admin" />
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
-                <action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />				
+				<action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />				
             </intent-filter>			
         </receiver>
-	
+		
     </application>
 </manifest>
