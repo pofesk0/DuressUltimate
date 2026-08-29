@@ -16,7 +16,7 @@ For data deletion, it is sufficient that a code of such length differs from your
 
 Since the reset trigger is length, the app does not require characters display
 
-This app will help to erase data in situations when you unlock your phone against your will. Situations with such coercion can happen in the daily life of absolutely every ordinary person. For example, this can happen on the street or during a night walk in the forest if you find yourself targeted by moral aggressors, self-styled patrols, or a bad company looking for an excuse to pick on someone. And of course, this can also happen at the airport and when crossing the border.
+This app will help to erase data in situations when you unlock your phone against your will. Situations with such coercion can happen in the daily life of absolutely every ordinary person. For example, this can happen on the street or during a night walk in the forest if you find yourself targeted by moral aggressors, self-styled patrols, or just a bad company looking for an excuse to pick on someone. And of course, this can also happen at the airport and when crossing the border.
 
 Теперь на русском:
 
@@ -36,4 +36,4 @@ DuressUltimate - Это приложение для готовности к не
 
 Поскольку триггером сброса является длина, приложение не требует отображения символов
 
-Это приложение поможет стереть данные в ситуациях, когда вы разблокируете телефон против своей воли. Ситуации с подобным принуждением могут встретиться в повседневной жизни абсолютно каждого простого человека. Например это может случиться на улице или при ночной прогулке в лесу если вы попали под прицел моральных агрессоров, самопровозглашенных патрулей или нехорошей компании ищущей повод до кого-то придраться. Ну и разумеется также это может случиться в аэропорту и при пересечении границы.
+Это приложение поможет стереть данные в ситуациях, когда вы разблокируете телефон против своей воли. Ситуации с подобным принуждением могут встретиться в повседневной жизни абсолютно каждого простого человека. Например это может случиться на улице или при ночной прогулке в лесу если вы попали под прицел моральных агрессоров, самопровозглашенных патрулей или просто нехорошей компании ищущей повод до кого-то придраться. Ну и разумеется также это может случиться в аэропорту и при пересечении границы.
