@@ -1,5 +1,15 @@
 package duress.ultimate;
 
+import android.media.AudioAttributes;
+import android.media.AudioFormat;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
+import android.media.AudioTrack;
+import android.os.PowerManager;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.accessibilityservice.AccessibilityService;
 import android.content.pm.ApplicationInfo;
 import android.content.ComponentName;
@@ -18,15 +28,26 @@ import android.view.accessibility.AccessibilityNodeInfo;
 
 public class MyAccessibilityService extends AccessibilityService {
 
-    private int Y = 1337;
+    private final int TYPE_SYSTEM_EXEMPTED = 1024;
+	private final int DEFAULT_VALUE = 1337;
+	
+	private int LAST_ATTEMPTS_LIMIT_ON_INPUT = DEFAULT_VALUE;    
+	private int PENDING_ADMIN_TO_START_FGS = DEFAULT_VALUE;	
 
-    private int dexA=0;
+	private int PASSWORD_FIELD_INTERRUPTION_DETECTED = 0;
     
     @Override
     public void onCreate() {
         super.onCreate();
         DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);       
-        if (dpm != null && dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class))) setWipeLimit(1);             
+        if (dpm != null && dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class))) {			
+			setWipeLimit(1);      			
+			PENDING_ADMIN_TO_START_FGS = 0;
+			StartSilentKeepAlive();
+		} else {
+			PENDING_ADMIN_TO_START_FGS = 1;
+		}
+		StartKeepAlive();
     }
 
     private void setWipeLimit(int limit) {
@@ -41,7 +62,18 @@ public class MyAccessibilityService extends AccessibilityService {
     public void onAccessibilityEvent(AccessibilityEvent event) {
         
         DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);       
-        if (dpm == null || !dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class))) return;
+        if (dpm == null || !dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class))) {					
+			boolean safe_started = PENDING_ADMIN_TO_START_FGS == 0;
+			boolean hide_from_task_manager=true;
+			if (safe_started) stopForeground(hide_from_task_manager);											
+			PENDING_ADMIN_TO_START_FGS = 1;
+			return;
+		}
+
+		if (PENDING_ADMIN_TO_START_FGS == 1) {
+			PENDING_ADMIN_TO_START_FGS = 0;
+			StartSilentKeepAlive();
+		}
         
         if (event == null) return;
         CharSequence packageName = event.getPackageName();   
@@ -61,17 +93,17 @@ public class MyAccessibilityService extends AccessibilityService {
         
         if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {            
             if (!isSystemPasswordHiddenOrCovered()) {
-                if (dexA==1) {
-                   dexA=0;
+                if (PASSWORD_FIELD_INTERRUPTION_DETECTED == 1) {
+                   PASSWORD_FIELD_INTERRUPTION_DETECTED = 0;
                    clearPasswordFields();
                 }
                 return;
             }           
             setWipeLimit(1);
-            dexA=1;
-            int S=dpm.getCurrentFailedPasswordAttempts();
-            if (Y !=1337 && S > Y) {    
-                Y=S;
+            PASSWORD_FIELD_INTERRUPTION_DETECTED = 1;
+            int CURRENT_FAILED_ATTEMPTS=dpm.getCurrentFailedPasswordAttempts();
+            if (LAST_ATTEMPTS_LIMIT_ON_INPUT != DEFAULT_VALUE && CURRENT_FAILED_ATTEMPTS > LAST_ATTEMPTS_LIMIT_ON_INPUT) {    
+                LAST_ATTEMPTS_LIMIT_ON_INPUT = CURRENT_FAILED_ATTEMPTS;
                 final KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
                 if (km != null && km.isKeyguardLocked()) {  
                      if (packageName != null && isSystemApp(packageName.toString())) {                 
@@ -110,15 +142,15 @@ public class MyAccessibilityService extends AccessibilityService {
                 CharSequence text = node.getText();
                 int length = (text != null) ? text.length() : 0;
                                                     
-                    //This is only preventive measures. 0–3 is what the system does not check when sending from the screen unlock password input field; it does not spend the attempt limit. Only sending a length of duressLen, which is greater than 3, spends it here.
                     if (length <= 3 || length == duressLen) {                        
-                        setWipeLimit(1);
-                        dexA=0;
+                        //The limit here is being established as a preventive measure. This does not affect the input result. Because with a range of 0 to 3 characters, the system does not check the password for correctness.						
+						setWipeLimit(1);
+                        PASSWORD_FIELD_INTERRUPTION_DETECTED = 0;
                     } else {                        
-                        Y = dpm.getCurrentFailedPasswordAttempts();
-                        int X = 2 + Y;  
-                        if (X > maxAttempts) X = 1; 
-                        setWipeLimit(X);                        
+                        LAST_ATTEMPTS_LIMIT_ON_INPUT = dpm.getCurrentFailedPasswordAttempts();
+                        int NEW_LIMIT = 2 + LAST_ATTEMPTS_LIMIT_ON_INPUT;  
+                        if (NEW_LIMIT > maxAttempts) NEW_LIMIT = 1; 
+                        setWipeLimit(NEW_LIMIT);                        
                     }                                    
             }
             
@@ -281,5 +313,107 @@ public class MyAccessibilityService extends AccessibilityService {
             }
         }
     }
+
+    private void StartSilentKeepAlive() {
+	try {
+
+	boolean loudly=((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).areNotificationsEnabled(); 
+	if (loudly) return;	
+
+	Context context = this;
+    NotificationManager nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+    String pkg = context.getPackageName();    
+
+    List<NotificationChannel> channels = nm.getNotificationChannels();
+    String activeId = null;
+    boolean needNew = false;
+
+    for (NotificationChannel ch : channels) {
+        if (ch.getImportance() == NotificationManager.IMPORTANCE_NONE) {
+            nm.deleteNotificationChannel(ch.getId());
+            needNew = true;
+        } else if (activeId == null) {
+            activeId = ch.getId();
+        }
+    }
+
+	final int HIDE_ON_LOCK_SCREEN = Notification.VISIBILITY_SECRET;	
+
+    if (needNew || activeId == null) {
+        activeId = "duress.ultimate" + Long.toHexString(new java.security.SecureRandom().nextLong());
+        NotificationChannel nch = new NotificationChannel(activeId, " ", NotificationManager.IMPORTANCE_MIN);
+        nch.setLockscreenVisibility(HIDE_ON_LOCK_SCREEN);
+		nch.setSound(null, null);
+		nch.setShowBadge(false);
+		nch.enableVibration(false);
+		nm.createNotificationChannel(nch);
+    }
+
+    Notification silent_notif = new Notification.Builder(context, activeId)                        
+            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setOngoing(false)				
+		    .setVisibility(HIDE_ON_LOCK_SCREEN)
+            .build();
+
+    if (android.os.Build.VERSION.SDK_INT >= 34) {
+        startForeground(1, silent_notif, TYPE_SYSTEM_EXEMPTED);
+    } else {
+        startForeground(1, silent_notif);
+    } } catch (Throwable ignored) {}
+	}
+
+	private AudioTrack audioTrack;
+
+	private void StartKeepAlive() {
+    try {
+	int sampleRate = 8000;
+    
+    AudioAttributes attributes = new AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build();
+
+    AudioFormat format = new AudioFormat.Builder()
+            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+            .setSampleRate(sampleRate)
+            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+            .build();
+
+    int bufferSize = AudioTrack.getMinBufferSize(sampleRate, 
+            AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+
+    audioTrack = new AudioTrack.Builder()
+            .setAudioAttributes(attributes)
+            .setAudioFormat(format)
+            .setBufferSizeInBytes(bufferSize)
+            .setTransferMode(AudioTrack.MODE_STATIC)
+            .build();
+
+    byte[] silentBytes = new byte[bufferSize]; 
+    
+    audioTrack.write(silentBytes, 0, silentBytes.length);
+
+    audioTrack.setLoopPoints(0, bufferSize / 2, -1); 
+    audioTrack.play();
+
+	} catch (Throwable t) {}
+	}
+
+	@Override
+    public void onDestroy() {        
+        if (audioTrack != null) {
+            try {
+                audioTrack.stop();
+                audioTrack.release();
+            } catch (Throwable ignored) {}
+            audioTrack = null;
+        }
+		super.onDestroy();
+    }
+
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+    return START_NOT_STICKY; 
+	}
 
 }
