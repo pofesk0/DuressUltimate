@@ -1,40 +1,39 @@
 # DuressUltimate (Duress Ultimate)
 
-An emergency preparedness app that wipes all phone data when you enter and submit any code with your configured length for reset instead of a password on the lock screen
+DuressUltimate - This is an application for being prepared for unexpected situations, which erases all data from the phone when entering and submitting any code of a length specified by you for reset instead of the password on the lock screen. It can also delete data when the attempt limit is exhausted.
 
-This app has the following advantages:
+Here's how it works:
 
-It in advance (when Admin and Accessibility
-rights are given) sets a minimal limit of unlock attempts for data reset
+After receiving all permissions, it sets the minimum unlock attempt limit for data reset
 
-Thus, this Fail-Safe protection is harder to bypass in Safe Mode or in case of application work stopping
+It temporarily increases this limit by 2 (up to the total value of 1–5 specified by you) when entering any code whose length differs the length for reset
 
-It increases this limit only temporarily (up to your configured value 1–5) when entering any code with a length different from the length for reset
+At all other times, the limit remains at the minimum by default, making bypassing the protection by simply stopping the process more difficult, which is how this differs from the standard Duress approach, which is why it is called Ultimate, meaning ultimate protection
 
 Length for reset can be not only longer, but also shorter than your password length, because data will be wiped precisely after submitting the code, not right after its input
 
-​A code with this length must simply be different from your password for the data wipe to be performed
+For data deletion, it is sufficient that a code of such length differs from your password
 
-Since the reset trigger is length, the app does NOT require characters display to be enabled
+Since the reset trigger is length, the app does not require characters display
 
-This app can be useful in situations when you unlock the phone against your will. Contrary to popular opinion, situations involving such coercion occur frequently in everyday life, not only at borders. That is, this can happen during a walk on the street if you seem strange to someone, or if someone decides to assert themselves at your expense. Always be prepared to protect your personal information. If it falls into someone else's hands, you will no longer be able to protect yourself either, because there will be something to blackmail you with. If someone tries to obtain your personal information, they are simply looking for grounds in it for subsequent violence. Do not let yourself be deceived. You will be safer getting rid of the information, even in front of your opponent.
+This app will help to erase data in situations when you unlock your phone against your will. Situations with such coercion can happen in the daily life of absolutely every ordinary person. For example, this can happen on the street or during a night walk in the forest if you find yourself targeted by moral aggressors, self-styled patrols, or a bad company looking for an excuse to pick on someone. And of course, this can also happen at the airport and when crossing the border.
 
-Перевод на русский:
+Теперь на русском:
 
-Приложение для экстренной готовности, которое стирает все данные с телефона при вводе и отправке любого кода заданной вами длины для сброса вместо пароля на экране блокировки
+DuressUltimate - Это приложение для готовности к неожиданным ситуациям, которое стирает все данные с телефона при вводе и отправке любого кода заданной вами длины для сброса вместо пароля на экране блокировки. Также может удалять данные при исчерпании лимита попыток.
 
-Это приложение обладает следующими преимуществами:
+Работает оно так:
 
-Оно заранее (когда выданы права Администратора и Спецвозможности) устанавливает минимальный лимит попыток разблокировки для сброса данных
+После получения всех разрешений оно устанавливает минимальный лимит попыток разблокировки для сброса данных
 
-Таким образом, эту отказоустойчивую защиту сложнее обойти в безопасном режиме или в случае остановки работы приложения
+Оно временно увеличивает этот лимит на 2 (суммарно до заданного вами значения 1–5) при вводе любого кода, длина которого отличается от длины для сброса
 
-Оно увеличивает этот лимит только временно (до заданного вами значения 1–5) при вводе любого кода, длина которого отличается от длины для сброса
+В остальное время лимит остаётся минимальным по умолчанию, усложняя обход защиты путём простой остановки процесса, чем это отличается от стандартного подхода Duress, поэтому и называется оно Ultimate имея ввиду ультимативную защиту
 
-Длина для сброса может быть не только больше, но и меньше вашего пароля, поскольку данные будут удалены именно после отправки кода, а не сразу после его ввода
+Длина для сброса может быть как больше, так и меньше вашего пароля, поскольку данные будут удалены именно после отправки кода, а не сразу после его ввода
 
 Для удаления данных достаточно, чтобы код такой длины отличался от вашего пароля
 
-Поскольку триггером сброса является длина, приложение НЕ требует чтобы было включено отображение символов
+Поскольку триггером сброса является длина, приложение не требует отображения символов
 
-Это приложение может быть полезно в ситуациях, когда вы разблокируете телефон против своей воли. Вопреки всеобщему мнению, ситуации с подобным принуждением встречаются часто в обычной жизни, а не только на границе. Тоесть такое может произойти при прогулке на улице если вы кому-то показались странным или если кто-то решил самоутвердиться за счет вас. Будьте всегда готовы защитить свою личную информацию. Если она попадет в чужие руки, вы больше не сможете защитить и себя, так как вас будет чем шантажировать. Если кто-то пытается заполучить вашу личную информацию, он просто ищет в ней повод для последующего насилия. Не давайте себя обмануть. Вам будет безопаснее избавиться от информации, даже на глазах оппонента.
+Это приложение поможет стереть данные в ситуациях, когда вы разблокируете телефон против своей воли. Ситуации с подобным принуждением могут встретиться в повседневной жизни абсолютно каждого простого человека. Например это может случиться на улице или при ночной прогулке в лесу если вы попали под прицел моральных агрессоров, самопровозглашенных патрулей или нехорошей компании ищущей повод до кого-то придраться. Ну и разумеется также это может случиться в аэропорту и при пересечении границы.
