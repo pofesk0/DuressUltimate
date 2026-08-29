@@ -1,5 +1,7 @@
 package duress.ultimate;
 
+import android.app.ActivityManager;
+import android.app.AlertDialog;
 import android.app.Activity;
 import android.app.KeyguardManager;
 import android.content.Context;
@@ -44,6 +46,7 @@ public class MainActivity extends Activity {
     private static final String CLOSE_WARNINGS = "close_warnings";
 
     private TextView text;
+	private AlertDialog dialog;
     private LinearLayout buttonBox;
     private TextView customInputDisplay;
     private StringBuilder currentInput = new StringBuilder();
@@ -89,32 +92,13 @@ public class MainActivity extends Activity {
         );
     }
 
-    private void EnableComponent2(int time) {
-        if (isComponentEnabled2()) return;
-        ComponentName componentName = new ComponentName(this, MyAccessibilityService.class);
-
-        PackageManager packageManager = getPackageManager();
-        packageManager.setComponentEnabledSetting(
-                componentName,
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                PackageManager.DONT_KILL_APP
-        );
-        if (time == 0) return;
-        android.os.SystemClock.sleep(time);
-    }
-
+    
     private boolean isComponentEnabled() {
         ComponentName componentName = new ComponentName(this, MainActivity.class);
         PackageManager pm = getPackageManager();
         return pm.getComponentEnabledSetting(componentName) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
     }
-
-    private boolean isComponentEnabled2() {
-        ComponentName componentName = new ComponentName(this, MyAccessibilityService.class);
-        PackageManager pm = getPackageManager();
-        return pm.getComponentEnabledSetting(componentName) == PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
-    }
-
+    
     private boolean isEn() { return !Locale.getDefault().getLanguage().equals("ru"); }
 
     @Override
@@ -236,14 +220,12 @@ public class MainActivity extends Activity {
             return;
         }      
                 
-        if (!admin) {
-            EnableComponent2(500);
+        if (!admin) {            
             render(isEn() ? TEXT_ADMIN_EN : TEXT_ADMIN);
             renderButtons(isEn() ? new String[]{"Grant rights"} : new String[]{"Дать права"}, null, false);
             return;
         }
-        if (!accessibility) {
-            EnableComponent2(1000);
+        if (!accessibility) {            
             if (dialogShown) {
                 render(isEn() ? TEXT_RESTRICTED_EN : TEXT_RESTRICTED);
                 renderButtons(isEn() ? new String[]{"App Settings", "Accessibility Settings"} : new String[]{"Настройки приложения", "Настройки спецвозможностей"}, null, false);
@@ -253,6 +235,7 @@ public class MainActivity extends Activity {
             }
             return;
         }        
+		showAccessibilityCrashAlert();
         if (!hasPin) {
             render(isEn() ? TEXT_SET_PIN_EN : TEXT_SET_PIN);
             renderPinInputStep(isEn() ? "Save PIN" : "Сохранить ПИН", 8, Integer.MAX_VALUE);
@@ -702,27 +685,62 @@ public class MainActivity extends Activity {
         return dpm != null && dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class));
     }
 
+	private boolean isServiceRunning() {
+    ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+    if (manager == null) return false;
+
+    String targetClassName = MyAccessibilityService.class.getName();
+
+    for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
+        if (targetClassName.equals(service.service.getClassName())) {
+            return true; 
+        }
+    }
+    return false; 
+	}
+
+	private void showAccessibilityCrashAlert() {
+	if (isServiceRunning()) return;	
+    boolean isRu = "ru".equals(Locale.getDefault().getLanguage());
+
+    dialog = new AlertDialog.Builder(this)
+        .setTitle(isRu ? "Внимание" : "Attention")
+        .setCancelable(false)
+		.setMessage(isRu ? "Спецвозможности включены, но сервис не запущен. Возможно произошла ошибка, например система остановила его из-за нехватки оперативной памяти. Просьба отключить ползунок сервиса а потом снова включить." 
+                         : "Accessibility features are enabled, but the service is not running. Perhaps an error occurred, for example, the system stopped it due to a lack of RAM. Please turn off the service slider and then turn it on again.")
+        .setPositiveButton(isRu ? "ОК" : "OK", (d, w) -> 
+            startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)))
+        .create();
+
+    if (dialog.getWindow() != null) {
+        android.view.WindowManager.LayoutParams lp = dialog.getWindow().getAttributes();
+        lp.gravity = android.view.Gravity.CENTER;
+        lp.x = 0;
+        lp.y = 0;
+        dialog.getWindow().setAttributes(lp);
+    }
+
+    dialog.show(); }
+
+
+
     @Override
 	protected void onDestroy() {
 		EntryActivity.isLogged = false;
 		isPinAuthenticated = false;
-		unregisterScreenOffReceiver();
+		unregisterScreenOffReceiver();		
+        if (dialog != null && dialog.isShowing()) {
+            dialog.dismiss();
+        }
+        dialog = null;		
         super.onDestroy();		
     }
 
-    private static final String TEXT_INTRO = "Привет, это приложение DuressUltimate.\nОно создано для защиты ваших данных путем их удаления в экстренной ситауции, которая может возникнуть в жизни любого.\nВ отличии от других подобных приложений, это продолжит предоставлять зашиту даже если его сервис спецвозможностей будет остановлен, но хоть раз был запущен, так как оно работает в режиме Fail-Safe.\n\nВ этом приложении вы можете задать длину пароля разблокировки экрана при вводе и отправке которой ваши данные будут удалены, при этом эта длина может быть как больше, так и меньше вашего обычного пароля и разумеется вам даже не нужно включать отображение символов. Например ваш основной пароль состоит из 10 символов, тогда вы задаете длину для сброса в 4 символа, чтобы точно не перепутать с основным паролем и не допустить опечатку. К тому же если длина сброса короче вашего основого пароля вам легче быстро стиреть данные в экстренной ситауции. Например, вы вводите и отправляете эту длину сброса когда вас принуждают ввести пароль, чтобы безвозвратно удалить данные и не дать злоумышленникам дальше давить на вас.\n\nКак это работает:\nприложение превентивно задает минимальный лимит попыток ввода пароля разблокировки экрана после которых все данные телефона будут удалены. Он равен 1-му. Когда вы вводите пароль который длиннее или короче лимита, оно временно дает вам дополнительные 2 попытки, что является одним правом на ошибку (когда у вас 1 попытка у вас 0 прав на ошибку). И при следующем вводе дает вам ещё одну, но не более сумарного числа попыток, которые вы можете настроить в приложении в рамках диапазона от 1 до 5. Например если 5, то у вас 4 права на ошибку.\n\nЕсли приложение будет остановлено системой без лишения прав администратора или обойдено через безопасный режим, то оно просто оставит свой предыдущий лимит и не увеличит его, так что любая ошибка станет фатальной.\n\nПоэтому приложение дает максимальный шанс сброса данных в экстренной ситуации, ведь в случае сбоя, оно не перестанет давать гарантию сброса данных, а просто увеличит шанс случайного сброса данных вами.\n\nПроще говоря, лучше потерять данные, чем чтобы они достались злоумышленникам, и приложение будет обеспечивать гарантию этого любой ценой";
-    private static final String TEXT_INTRO_EN = "Hello, this is the DuressUltimate application.\n"
-            + "It is designed to protect your data by wiping it in an emergency situation that can happen in anyone's life.\n"
-            + "Unlike other similar apps, it will continue to provide protection even if its accessibility service is stopped, as long as it was launched at least once, because it operates in Fail-Safe mode.\n\n"
-            + "In this app, you can set the screen unlock password length which, when entered and submitted, will trigger the deletion of your phone data. This length can be either longer or shorter than your regular password, and of course, you don't even need to enable character visibility. For example, if your main password consists of 10 characters, you can set the wipe length to 4 characters to ensure you don't confuse it with your main password and avoid typos. Additionally, if the wipe length is shorter than your main password, it is easier to quickly wipe the data in an emergency. For instance, you can enter and submit this wipe length when forced to enter a password, irrecoverably wiping the data and preventing attackers from pressuring you further.\n\n"
-            + "How it works:\n"
-            + "The app preemptively sets the minimum limit of screen unlock password attempts after which all phone data will be wiped. It is set to 1. When you enter a password that is longer or shorter than the limit, it temporarily grants you 2 additional attempts, which acts as one allowed mistake (when you have 1 attempt, you have 0 allowed mistakes). And upon the next entry, it gives you one more, but no more than the total number of attempts you can configure in the app within the range of 1 to 5. For example, if it's 5, you have 4 allowed mistakes.\n\n"
-            + "If the app is stopped by the system without revoking device administrator rights, or bypassed via safe mode, it will simply keep its previous limit and will not increase it, making any mistake fatal.\n\n"
-            + "Therefore, the app provides the maximum chance of wiping data in an emergency situation; in the event of a failure, it does not stop guaranteeing data destruction, but simply increases the chance of an accidental wipe by you.\n\n"
-            + "Simply put, it is better to lose data than to let it fall into the hands of attackers, and the app will guarantee this at any cost.";
-
-    private static final String TEXT_ERROR = "Возникла ошибка безопасности. Вот она:\nпамять приложения была очищена пользователем или системой";
-    private static final String TEXT_ERROR_EN = "A security error occurred. The error is:\nthe application memory was cleared by the user or system";
+    private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки.\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Не используйте другие типы блокировки, например графический ключ. Также не используйте разблокировку по биометрии и отключите агентов доверия в настройках безопасности вашего телефона.";
+	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded.\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Don't use other lock types, such as pattern locks. Also, don't use biometric unlock and please disable trust agents in your device security settings.";
+	
+    private static final String TEXT_ERROR = "Возникла ошибка:\nпамять приложения была очищена либо состояние пакета изменено некорректно";
+    private static final String TEXT_ERROR_EN = "An error occurred:\nthe application data was cleared or the package state was modified incorrectly";
 
     private static final String TEXT_ACCESSIBILITY = "Теперь, дайте приложению Спецвозможности. Они нужны для определения длины паролей в полях ввода. Перейдите в настройки Спецвозможностей -> установленные приложения -> и включите их для DuressUltimate.";
     private static final String TEXT_ACCESSIBILITY_EN = "Now, please grant to the app the Accessibility features. They are needed for the work of features for determining the passwords lengths in input fields. Go to Accessibility settings -> installed apps -> and enable them for DuressUltimate.";
@@ -745,8 +763,8 @@ public class MainActivity extends Activity {
     private static final String TEXT_TOGGLE_CLOSE_WARNINGS = "Закрывать окна предупреждений об оставшихся попытках";
     private static final String TEXT_TOGGLE_CLOSE_WARNINGS_EN = "Close warning windows about remaining attempts";
 
-    private static final String TEXT_CONFIRM_DISABLE_WARNINGS = "Вы хотите отключить закрытие всплывающих окон об оставшемся количестве попыток ввода пароля до сброса данных? Обычно вам не стоит этого делать, вы и так знаете сколько у вас всего попыток, а злоумышленникам эта информация может быть полезйней, чем вам. Выключайте это ТОЛЬКО ЕСЛИ опция работает со сбоями, наример происходят случайные нажатия в другие области экрана.";
-    private static final String TEXT_CONFIRM_DISABLE_WARNINGS_EN = "Do you want to disable closing the pop-up windows about the remaining number of password entry attempts before data wipe? Usually, you should not do this; you already know how many attempts you have, and this information might be more useful to attackers than to you. Disable this ONLY IF the option is malfunctioning, for example, accidental taps occur in other areas of the screen.";
+    private static final String TEXT_CONFIRM_DISABLE_WARNINGS = "Вы хотите отключить закрытие всплывающих окон об оставшемся количестве попыток ввода пароля до сброса данных? Обычно вам не стоит этого делать - вы и так знаете сколько у вас всего попыток, ведь вы настраивали это здесь. Зато эта информация может быть интересна другим людям, поэтому лучше скрывать эти окна. Выключайте это ТОЛЬКО ЕСЛИ опция неисправна.";
+    private static final String TEXT_CONFIRM_DISABLE_WARNINGS_EN = "Do you want to disable closing the pop-up windows about the remaining number of password entry attempts before data wipe? Usually, you should not do this - you already know how many attempts you have, because you configured this here. However, this information may be interesting to other people, so it’s better to hide these windows. Disable this ONLY IF the option is malfunctioning.";
 
     private static final String BTN_YES_DISABLE = "Да, отключить закрытие всплывающих окон.";
     private static final String BTN_YES_DISABLE_EN = "Yes, disable closing of pop-up windows.";
