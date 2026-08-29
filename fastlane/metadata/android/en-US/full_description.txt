@@ -1,15 +1,15 @@
-DuressUltimate (Duress Ultimate) — an emergency preparedness app that wipes all phone data when you enter and submit any code with your configured length for reset instead of a password on the lock screen
+Duress Ultimate - This is an application for being prepared for unexpected situations, which erases all data from the phone when entering and submitting any code of a length specified by you for reset instead of the password on the lock screen. It can also delete data when the attempt limit is exhausted.
 
-This app has the following advantages:
+Here's how it works:
 
-It in advance (when Admin and Accessibility rights are given) sets a minimal limit of unlock attempts for data reset
+After receiving all permissions, it sets the minimum unlock attempt limit for data reset
 
-Thus, this Fail-Safe protection is harder to bypass in Safe Mode or in case of application work stopping
+It temporarily increases this limit by 2 (up to the total value of 1–5 specified by you) when entering any code whose length differs the length for reset
 
-It increases this limit only temporarily (up to your configured value 1–5) when entering any code with a length different from the length for reset
+At all other times, the limit remains at the minimum by default, making bypassing the protection by simply stopping the process more difficult, which is how this differs from the standard Duress approach, which is why it is called Ultimate, meaning ultimate protection
 
 Length for reset can be not only longer, but also shorter than your password length, because data will be wiped precisely after submitting the code, not right after its input
 
-​A code with this length must simply be different from your password for the data wipe to be performed
+For data deletion, it is sufficient that a code of such length differs from your password
 
-Since the reset trigger is length, the app does NOT require characters display to be enabled
+Since the reset trigger is length, the app does not require characters display
