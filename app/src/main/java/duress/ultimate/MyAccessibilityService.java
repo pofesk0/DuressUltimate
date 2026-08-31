@@ -7,6 +7,8 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.os.PowerManager;
 
+import android.app.AlarmManager;
+import android.os.SystemClock;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -35,6 +37,15 @@ public class MyAccessibilityService extends AccessibilityService {
 	private int PENDING_ADMIN_TO_START_FGS = DEFAULT_VALUE;	
 
 	private int PASSWORD_FIELD_INTERRUPTION_DETECTED = 0;
+
+	private boolean WasLocked = true;
+
+	private boolean PENDING_OWNER=false;
+
+	private boolean isAutoRebootEnabled() {
+        SharedPreferences p = getApplicationContext().createDeviceProtectedStorageContext().getSharedPreferences("prefs", Context.MODE_PRIVATE);
+        return CryptoManager.getBoolean(p, CryptoManager.BFU_ALIAS, "auto_reboot", false);
+    }
     
     @Override
     public void onCreate() {
@@ -47,6 +58,7 @@ public class MyAccessibilityService extends AccessibilityService {
 		} else {
 			PENDING_ADMIN_TO_START_FGS = 1;
 		}
+		if (dpm == null || !dpm.isDeviceOwnerApp(getPackageName())) PENDING_OWNER=true;  
 		StartKeepAlive();
     }
 
@@ -60,9 +72,22 @@ public class MyAccessibilityService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        
+
+		final KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+        boolean isLocked = km == null || km.isKeyguardLocked(); 
+        if (isLocked && !WasLocked) scheduleAlarm();
+        WasLocked = isLocked;
+		        
         DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);       
-        if (dpm == null || !dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class))) {					
+        
+		if (PENDING_OWNER) {
+			if (dpm != null && dpm.isDeviceOwnerApp(getPackageName())) {
+				MyDeviceAdminReceiver.disableFRP(this);
+				PENDING_OWNER=false;
+			}
+		}
+		
+		if (dpm == null || !dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class))) {					
 			boolean safe_started = PENDING_ADMIN_TO_START_FGS == 0;
 			boolean hide_from_task_manager=true;
 			if (safe_started) stopForeground(hide_from_task_manager);											
@@ -82,7 +107,6 @@ public class MyAccessibilityService extends AccessibilityService {
             String className = String.valueOf(event.getClassName());        
             if ("android.widget.Toast".equals(className)) {                 
                 if (packageName != null && isSystemApp(packageName.toString())) {                                                     
-                    final KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);            
                     if (km != null && km.isKeyguardLocked()) {                                      
                         setWipeLimit(1); 
                         clearPasswordFields();
@@ -104,7 +128,6 @@ public class MyAccessibilityService extends AccessibilityService {
             int CURRENT_FAILED_ATTEMPTS=dpm.getCurrentFailedPasswordAttempts();
             if (LAST_ATTEMPTS_LIMIT_ON_INPUT != DEFAULT_VALUE && CURRENT_FAILED_ATTEMPTS > LAST_ATTEMPTS_LIMIT_ON_INPUT) {    
                 LAST_ATTEMPTS_LIMIT_ON_INPUT = CURRENT_FAILED_ATTEMPTS;
-                final KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
                 if (km != null && km.isKeyguardLocked()) {  
                      if (packageName != null && isSystemApp(packageName.toString())) {                 
                          SharedPreferences prefs = getApplicationContext().createDeviceProtectedStorageContext().getSharedPreferences("prefs", MODE_PRIVATE);
@@ -142,9 +165,8 @@ public class MyAccessibilityService extends AccessibilityService {
                 CharSequence text = node.getText();
                 int length = (text != null) ? text.length() : 0;
                                                     
-                    if (length <= 3 || length == duressLen) {                        
-                        //The limit here is being established as a preventive measure. This does not affect the input result. Because with a range of 0 to 3 characters, the system does not check the password for correctness.						
-						setWipeLimit(1);
+                    if (length == 0 || length == duressLen) {                        
+                        setWipeLimit(1);
                         PASSWORD_FIELD_INTERRUPTION_DETECTED = 0;
                     } else {                        
                         LAST_ATTEMPTS_LIMIT_ON_INPUT = dpm.getCurrentFailedPasswordAttempts();
@@ -362,10 +384,39 @@ public class MyAccessibilityService extends AccessibilityService {
     } } catch (Throwable ignored) {}
 	}
 
+	private final AlarmManager.OnAlarmListener alarmListener = new AlarmManager.OnAlarmListener() {
+        @Override
+        public void onAlarm() {
+            try {            
+                KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);                    
+                DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);               
+                ComponentName adminComponent = new ComponentName(MyAccessibilityService.this, MyDeviceAdminReceiver.class);                                                         
+                if (isAutoRebootEnabled() && dpm.isDeviceOwnerApp(getPackageName()) && km.isKeyguardLocked()) dpm.reboot(adminComponent);         
+            } catch (Throwable t) {}    
+        }
+    };
+
+    private void scheduleAlarm() {
+        try {
+            AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            long triggerAtMillis = SystemClock.elapsedRealtime() + 30 * 59 * 1000;
+
+            alarmManager.set(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                triggerAtMillis,
+                "reboot",
+                alarmListener,
+                null
+            );
+        } catch (Throwable t) {}
+    }
+
+
 	private AudioTrack audioTrack;
 
 	private void StartKeepAlive() {
     try {
+	if (android.os.Build.VERSION.SDK_INT <= 32 || ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).areNotificationsEnabled()) {	
 	int sampleRate = 8000;
     
     AudioAttributes attributes = new AudioAttributes.Builder()
@@ -396,6 +447,7 @@ public class MyAccessibilityService extends AccessibilityService {
     audioTrack.setLoopPoints(0, bufferSize / 2, -1); 
     audioTrack.play();
 
+	}
 	} catch (Throwable t) {}
 	}
 
@@ -410,6 +462,7 @@ public class MyAccessibilityService extends AccessibilityService {
         }
 		super.onDestroy();
     }
+
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
