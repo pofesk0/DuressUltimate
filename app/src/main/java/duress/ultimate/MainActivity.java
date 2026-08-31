@@ -1,7 +1,7 @@
 package duress.ultimate;
 
 import android.app.ActivityManager;
-import android.app.AlertDialog;
+import android.app.admin.DeviceAdminInfo;
 import android.app.Activity;
 import android.app.KeyguardManager;
 import android.content.Context;
@@ -29,6 +29,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.app.AlertDialog;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
@@ -47,6 +48,7 @@ public class MainActivity extends Activity {
 
     private TextView text;
 	private AlertDialog dialog;
+	private AlertDialog deviceOwnerDialog;
     private LinearLayout buttonBox;
     private TextView customInputDisplay;
     private StringBuilder currentInput = new StringBuilder();
@@ -54,6 +56,47 @@ public class MainActivity extends Activity {
     private boolean isPinAuthenticated = false;
 
 	private BroadcastReceiver screenOffReceiver;
+
+	private AlertDialog usbWarningDialog;
+
+	private void showUsbWarningAlert() {
+    if (usbWarningDialog != null && usbWarningDialog.isShowing()) return;
+
+    String alertTitle = isEn() ? "Warning:" : "Предупреждение:";
+    String alertMsg = isEn() 
+        ? "Disabling USB functions occurs at the operating system level and does not affect the low-level logic of the USB port, meaning it does not provide 100% protection.\nThis is just a step towards security.\nIf you want the ability to completely disable the USB port, it is better to use the GrapheneOS operating system."
+        : "Отключение USB функций происходит на уровне операционной системы и не затрагивает низкоуровневую логику USB порта, тоесть не даёт 100-процентной защиты.\nЭто лишь шаг к безопасности.\nЕсли вы хотите возможность полного отключения USB порта, лучше использовать операционную систему GrapheneOS.";
+
+    usbWarningDialog = new AlertDialog.Builder(this)
+            .setTitle(alertTitle)
+            .setMessage(alertMsg)
+            .setPositiveButton("OK", (dialog, which) -> usbWarningDialog = null)
+            .create();
+
+    Window window = usbWarningDialog.getWindow();
+    if (window != null) {
+        WindowManager.LayoutParams params = window.getAttributes();
+        params.gravity = Gravity.CENTER;
+        params.x = 0;
+        params.y = 0;
+        window.setAttributes(params);
+    }
+
+    usbWarningDialog.setOnShowListener(dialog -> {
+        TextView titleView = usbWarningDialog.findViewById(getResources().getIdentifier("alertTitle", "id", "android"));
+        if (titleView != null) {
+            titleView.setTextColor(Color.parseColor("#ff5555"));
+        }
+        TextView msgView = usbWarningDialog.findViewById(android.R.id.message);
+        if (msgView != null) {
+            msgView.setTextIsSelectable(true);
+        }
+    });
+
+    usbWarningDialog.setOnDismissListener(dialog -> usbWarningDialog = null);
+    usbWarningDialog.show();
+	}
+
 
 	private void registerScreenOffReceiver() {
     screenOffReceiver = new BroadcastReceiver() {
@@ -90,9 +133,8 @@ public class MainActivity extends Activity {
                 PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
                 PackageManager.DONT_KILL_APP
         );
-    }
+    }    
 
-    
     private boolean isComponentEnabled() {
         ComponentName componentName = new ComponentName(this, MainActivity.class);
         PackageManager pm = getPackageManager();
@@ -180,6 +222,38 @@ public class MainActivity extends Activity {
     private SharedPreferences getCEPrefs() {
         return getApplicationContext().getSharedPreferences(CE_PREFS, MODE_PRIVATE);
     }
+    
+    private boolean isDeviceOwner() {
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        return dpm != null && dpm.isDeviceOwnerApp(getPackageName());
+    }
+
+    private void showDeviceOwnerInstruction() {
+        String msg = isEn() ? "These features are available only if you have Device Owner rights. To obtain them, you must not have accounts or third-party users on the device. If they exist, delete them or just perform a factory reset.\nThen install this app again and use the adb command to activate Device Owner:\nadb shell dpm set-device-owner duress.ultimate/.MyDeviceAdminReceiver" 
+                            : "Эти функции доступны только если есть права Device Owner, для того чтобы их получить у вас не должно быть аккунтов и сторонних пользователей на устройстве. Если они есть, удалите их или просто сбросьте настройки.\nЗатем установите снова это приложение и используйте adb комманду для активации Device Owner:\nadb shell dpm set-device-owner duress.ultimate/.MyDeviceAdminReceiver";      
+        
+        deviceOwnerDialog = new AlertDialog.Builder(this)
+                .setMessage(msg)
+                .setPositiveButton("OK", (dialog, which) -> deviceOwnerDialog = null)
+                .create();
+
+        Window window = deviceOwnerDialog.getWindow();
+        if (window != null) {
+            WindowManager.LayoutParams params = window.getAttributes();
+            params.gravity = Gravity.CENTER;
+            params.x = 0;
+            params.y = 0;
+            window.setAttributes(params);
+        }
+
+        deviceOwnerDialog.setOnDismissListener(dialog -> deviceOwnerDialog = null);
+        deviceOwnerDialog.show();
+
+        TextView messageView = deviceOwnerDialog.findViewById(android.R.id.message);
+        if (messageView != null) {
+            messageView.setTextIsSelectable(true);
+        }
+    }
 
     private void updateUI() {
         SharedPreferences p = getProtectedPrefs();
@@ -262,17 +336,16 @@ public class MainActivity extends Activity {
 
         SharedPreferences p = getProtectedPrefs();
         boolean isCloseWarningsEnabled = CryptoManager.getBoolean(p, CryptoManager.BFU_ALIAS, CLOSE_WARNINGS, true);
+        
+        DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        ComponentName adminName = new ComponentName(this, MyDeviceAdminReceiver.class);
+        boolean isDO = isDeviceOwner();
 
         CheckBox checkBox = new CheckBox(this);
         checkBox.setText(isEn() ? TEXT_TOGGLE_CLOSE_WARNINGS_EN : TEXT_TOGGLE_CLOSE_WARNINGS);
         checkBox.setTextColor(Color.WHITE);
         checkBox.setTextSize(16f);
-        checkBox.setChecked(isCloseWarningsEnabled);
-
-        LinearLayout.LayoutParams cbParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        cbParams.setMargins(0, 0, 0, 32);
-        checkBox.setLayoutParams(cbParams);
-
+        checkBox.setChecked(isCloseWarningsEnabled);                
         checkBox.setOnClickListener(v -> {
             if (!checkBox.isChecked()) {
                 checkBox.setChecked(true);
@@ -285,9 +358,145 @@ public class MainActivity extends Activity {
                 Toast.makeText(MainActivity.this, isEn() ? TOAST_ENABLED_EN : TOAST_ENABLED, Toast.LENGTH_SHORT).show();
             }
         });
-
         buttonBox.addView(checkBox);
+        
+        if (Build.VERSION.SDK_INT >= 31) {
+		CheckBox cbUsbAndDebug = new CheckBox(this);
+        cbUsbAndDebug.setText(isEn() ? "Disallow USB-connetions and debugging features" : "Запретить USB-подключения и функции отладки");
+        cbUsbAndDebug.setTextColor(Color.WHITE);
+        cbUsbAndDebug.setTextSize(16f);
+        
+        if (isDO) {
+            boolean usbDataDisabled = !dpm.isUsbDataSignalingEnabled();
+            Bundle restrictions = dpm.getUserRestrictions(adminName);
+            boolean usbFileTransferDisabled = restrictions.getBoolean(UserManager.DISALLOW_USB_FILE_TRANSFER, false);
+            boolean adbDisabled = restrictions.getBoolean(UserManager.DISALLOW_DEBUGGING_FEATURES, false);
 
+            cbUsbAndDebug.setChecked(usbDataDisabled && usbFileTransferDisabled && adbDisabled);
+        } else {
+            cbUsbAndDebug.setChecked(false);
+            cbUsbAndDebug.setAlpha(0.5f);
+        }
+
+        cbUsbAndDebug.setOnClickListener(v -> {
+            if (!isDO) {
+                cbUsbAndDebug.setChecked(false);
+                showDeviceOwnerInstruction();
+                return;
+            }
+            if (cbUsbAndDebug.isChecked()) {                                
+                dpm.setUsbDataSignalingEnabled(false);                
+                dpm.addUserRestriction(adminName, UserManager.DISALLOW_USB_FILE_TRANSFER);
+                dpm.addUserRestriction(adminName, UserManager.DISALLOW_DEBUGGING_FEATURES);
+                showUsbWarningAlert();
+            } else {                
+                dpm.setUsbDataSignalingEnabled(true);                
+                dpm.clearUserRestriction(adminName, UserManager.DISALLOW_USB_FILE_TRANSFER);
+                dpm.clearUserRestriction(adminName, UserManager.DISALLOW_DEBUGGING_FEATURES);
+            }
+        });
+        buttonBox.addView(cbUsbAndDebug);
+		}
+
+	if (isDO) {
+    CheckBox cbRestrictions1 = new CheckBox(this);
+    cbRestrictions1.setText(isEn() ? "Disallow autofill, backup, and mount physical media" : "Запретить автозаполнение, бэкап и монтирование физических носителей");
+    cbRestrictions1.setTextColor(Color.WHITE);
+    cbRestrictions1.setTextSize(16f);
+    
+    if (isDO) {
+        Bundle restrictions = dpm.getUserRestrictions(adminName);
+        boolean autofillDisabled = restrictions.getBoolean(UserManager.DISALLOW_AUTOFILL, false);
+        boolean mountMediaDisabled = restrictions.getBoolean(UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA, false);
+        boolean backupEnabled = dpm.isBackupServiceEnabled(adminName);
+
+        cbRestrictions1.setChecked(autofillDisabled && mountMediaDisabled && !backupEnabled);
+    } else {
+        cbRestrictions1.setChecked(false);
+        cbRestrictions1.setAlpha(0.5f);
+    }
+
+    cbRestrictions1.setOnClickListener(v -> {
+        if (!isDO) {
+            cbRestrictions1.setChecked(false);
+            showDeviceOwnerInstruction();
+            return;
+        }
+        if (cbRestrictions1.isChecked()) {
+			dpm.addUserRestriction(adminName, UserManager.DISALLOW_AUTOFILL);
+            dpm.addUserRestriction(adminName, UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA);
+            dpm.setBackupServiceEnabled(adminName, false);
+        } else {
+            dpm.clearUserRestriction(adminName, UserManager.DISALLOW_AUTOFILL);
+            dpm.clearUserRestriction(adminName, UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA);
+            dpm.setBackupServiceEnabled(adminName, true);
+        }
+    });
+    buttonBox.addView(cbRestrictions1);
+	}
+
+	boolean isGranted = dpm != null && dpm.hasGrantedPolicy(new ComponentName(this, MyDeviceAdminReceiver.class), DeviceAdminInfo.USES_POLICY_DISABLE_KEYGUARD_FEATURES);
+
+	if (isDO && isGranted) {
+    CheckBox cbRestrictions2 = new CheckBox(this);
+    cbRestrictions2.setText(isEn() ? "Disallow trust agents and biometric unlock" : "Запретить агентов доверия и биометрию");
+    cbRestrictions2.setTextColor(Color.WHITE);
+    cbRestrictions2.setTextSize(16f);
+    
+    if (isDO) {
+        int disabledFeatures = dpm.getKeyguardDisabledFeatures(adminName);
+        boolean trustAgentsDisabled = (disabledFeatures & DevicePolicyManager.KEYGUARD_DISABLE_TRUST_AGENTS) != 0;
+        boolean biometricsDisabled = (disabledFeatures & DevicePolicyManager.KEYGUARD_DISABLE_BIOMETRICS) != 0;
+
+        cbRestrictions2.setChecked(trustAgentsDisabled && biometricsDisabled);
+    } else {
+        cbRestrictions2.setChecked(false);
+        cbRestrictions2.setAlpha(0.5f);
+    }
+
+    cbRestrictions2.setOnClickListener(v -> {
+        if (!isDO) {
+            cbRestrictions2.setChecked(false);
+            showDeviceOwnerInstruction();
+            return;
+        }
+        int currentFeatures = dpm.getKeyguardDisabledFeatures(adminName);
+        if (cbRestrictions2.isChecked()) {
+            int newFeatures = currentFeatures | DevicePolicyManager.KEYGUARD_DISABLE_TRUST_AGENTS 
+                                            | DevicePolicyManager.KEYGUARD_DISABLE_BIOMETRICS;
+            dpm.setKeyguardDisabledFeatures(adminName, newFeatures);
+        } else {
+            int newFeatures = currentFeatures & ~DevicePolicyManager.KEYGUARD_DISABLE_TRUST_AGENTS 
+                                             & ~DevicePolicyManager.KEYGUARD_DISABLE_BIOMETRICS;
+            dpm.setKeyguardDisabledFeatures(adminName, newFeatures);
+        }
+    });
+    buttonBox.addView(cbRestrictions2);
+	}
+		
+        CheckBox cbReboot = new CheckBox(this);
+		cbReboot.setText(isEn() ? "Auto-reboot (30 minutes after screen off)" : "Авто-перезагрузка (30 мин после выкл экрана)");
+		cbReboot.setTextColor(Color.WHITE);
+		cbReboot.setTextSize(16f);
+		if (isDO) { 
+			cbReboot.setChecked(CryptoManager.getBoolean(p, CryptoManager.BFU_ALIAS, "auto_reboot", false));
+		} else {
+			cbReboot.setChecked(false); 
+			cbReboot.setAlpha(0.5f);
+		}
+		cbReboot.setOnClickListener(v -> { 
+			if (!isDO) {   
+				cbReboot.setChecked(false);   
+				showDeviceOwnerInstruction();    
+				return;
+			} 
+			CryptoManager.putBoolean(p, CryptoManager.BFU_ALIAS, "auto_reboot", cbReboot.isChecked());
+		});
+		LinearLayout.LayoutParams rbParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rbParams.setMargins(0, 0, 0, 32);
+        cbReboot.setLayoutParams(rbParams);
+        buttonBox.addView(cbReboot);
+                
         for (String a : actions) {
             Button b = new Button(this);
             b.setText(a);
@@ -685,6 +894,30 @@ public class MainActivity extends Activity {
         return dpm != null && dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class));
     }
 
+    @Override
+	protected void onDestroy() {
+		EntryActivity.isLogged = false;
+		isPinAuthenticated = false;
+		unregisterScreenOffReceiver();
+		
+		if (deviceOwnerDialog != null && deviceOwnerDialog.isShowing()) {
+            deviceOwnerDialog.dismiss();            
+        }
+		deviceOwnerDialog = null;
+		
+		if (usbWarningDialog != null && usbWarningDialog.isShowing()) {    
+			usbWarningDialog.dismiss();    			
+		}
+		usbWarningDialog = null;
+
+		if (dialog != null && dialog.isShowing()) {
+            dialog.dismiss();
+        }
+        dialog = null;		
+
+        super.onDestroy();		
+    }
+
 	private boolean isServiceRunning() {
     ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
     if (manager == null) return false;
@@ -698,6 +931,7 @@ public class MainActivity extends Activity {
     }
     return false; 
 	}
+
 
 	private void showAccessibilityCrashAlert() {
 	if (isServiceRunning()) return;	
@@ -723,21 +957,9 @@ public class MainActivity extends Activity {
     dialog.show(); }
 
 
-
-    @Override
-	protected void onDestroy() {
-		EntryActivity.isLogged = false;
-		isPinAuthenticated = false;
-		unregisterScreenOffReceiver();		
-        if (dialog != null && dialog.isShowing()) {
-            dialog.dismiss();
-        }
-        dialog = null;		
-        super.onDestroy();		
-    }
-
-    private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки.\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Не используйте другие типы блокировки, например графический ключ. Также не используйте разблокировку по биометрии и отключите агентов доверия в настройках безопасности вашего телефона.";
-	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded.\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Don't use other lock types, such as pattern locks. Also, don't use biometric unlock and please disable trust agents in your device security settings.";
+   
+    private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки.\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Не используйте другие типы блокировки, например графический ключ. Также не используйте разблокировку по биометрии и отключите агентов доверия в настройках безопасности вашего телефона.\n\nТакже важно сообщить что сброс по лимиту попыток не удаляет раздел FRP основного профиля, который хранит ID аккаунтов. Если хотите не оставлять следов от ваших Google аккаунтов, рекомендуется хранить их только в рабочих профилях, которые не могут быть завязаны на FRP. В остальных случаях будьте аккуратны и не привязывайте бекапы и важные данные к ним, также убедитесь что физического доступа к сим-карте недостаточно для получения контроля над ними, проще говоря не привязывайте их к номеру телефона.\n\nЕсли выдадить этому приложению права Device Owner, оно сможет отключить FRP.";
+	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded.\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Don't use other lock types, such as pattern locks. Also, don't use biometric unlock and please disable trust agents in your device security settings.\n\nIt is also important to inform that a reset by attempt limit does not delete the FRP section of the main profile, which stores account IDs. If you want not to leave traces of your Google accounts, it is recommended to store them only in work profiles, which cannot be linked to FRP. In other cases, be careful and do not link backups and important data to them, also make sure that physical access to the SIM card is not enough to gain control over them, simply put do not link them to a phone number.\n\nIf grant this app Device Owner rights, it can disable FRP.";
 	
     private static final String TEXT_ERROR = "Возникла ошибка:\nпамять приложения была очищена либо состояние пакета изменено некорректно";
     private static final String TEXT_ERROR_EN = "An error occurred:\nthe application data was cleared or the package state was modified incorrectly";
@@ -774,4 +996,5 @@ public class MainActivity extends Activity {
 
     private static final String TOAST_ENABLED = "Опция успешно включена";
     private static final String TOAST_ENABLED_EN = "Option successfully enabled";
+
 }
