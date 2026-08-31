@@ -3,5 +3,6 @@
     <uses-policies>
         <wipe-data />
         <watch-login/>
+        <disable-keyguard-features />
     </uses-policies>
 </device-admin>
