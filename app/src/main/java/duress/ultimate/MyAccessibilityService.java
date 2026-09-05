@@ -165,7 +165,7 @@ public class MyAccessibilityService extends AccessibilityService {
                 CharSequence text = node.getText();
                 int length = (text != null) ? text.length() : 0;
                                                     
-                    if (length == 0 || length == duressLen) {                        
+                    if (length == duressLen || length == 0 || (km != null && km.isKeyguardLocked() && length < 4)) {                                                                        
                         setWipeLimit(1);
                         PASSWORD_FIELD_INTERRUPTION_DETECTED = 0;
                     } else {                        
