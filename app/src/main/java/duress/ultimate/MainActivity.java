@@ -399,6 +399,44 @@ public class MainActivity extends Activity {
 		}
 
 	if (isDO) {
+	CheckBox cbCameraAndCapture = new CheckBox(this);
+        cbCameraAndCapture.setText(isEn()
+        ? "Disallow camera and screenshots"
+        : "Запретить камеру и скриншоты");
+        cbCameraAndCapture.setTextColor(Color.WHITE);
+        cbCameraAndCapture.setTextSize(15f);
+
+        boolean isCamDisabled = false;
+        boolean isScrDisabled = false;
+
+        if (isDO) {    
+            
+            isCamDisabled = dpm.getCameraDisabled(adminName);        
+            isScrDisabled = dpm.getScreenCaptureDisabled(adminName);                    
+            cbCameraAndCapture.setChecked(isCamDisabled && isScrDisabled);
+
+        } else {   
+            cbCameraAndCapture.setChecked(false);   
+            cbCameraAndCapture.setAlpha(0.5f);
+        }
+
+    cbCameraAndCapture.setOnClickListener(v -> {
+    
+            if (!isDO) {     
+                cbCameraAndCapture.setChecked(false);      
+                showDeviceOwnerInstruction();       
+                return;   
+            }
+
+    boolean shouldDisable = cbCameraAndCapture.isChecked();
+
+    dpm.setCameraDisabled(adminName, shouldDisable);
+    dpm.setScreenCaptureDisabled(adminName, shouldDisable);    
+        
+    });
+
+    buttonBox.addView(cbCameraAndCapture);
+
     CheckBox cbRestrictions1 = new CheckBox(this);
     cbRestrictions1.setText(isEn() ? "Disallow autofill, backup, and mount physical media" : "Запретить автозаполнение, бэкап и монтирование физических носителей");
     cbRestrictions1.setTextColor(Color.WHITE);
@@ -435,11 +473,11 @@ public class MainActivity extends Activity {
     buttonBox.addView(cbRestrictions1);
 	}
 
-	boolean isGranted = dpm != null && dpm.hasGrantedPolicy(new ComponentName(this, MyDeviceAdminReceiver.class), DeviceAdminInfo.USES_POLICY_DISABLE_KEYGUARD_FEATURES);
+	boolean isGrantedKeyguard = dpm != null && dpm.hasGrantedPolicy(new ComponentName(this, MyDeviceAdminReceiver.class), DeviceAdminInfo.USES_POLICY_DISABLE_KEYGUARD_FEATURES);
 
-	if (isDO && isGranted) {
+	if (isDO && isGrantedKeyguard) {
     CheckBox cbRestrictions2 = new CheckBox(this);
-    cbRestrictions2.setText(isEn() ? "Disallow trust agents and biometric unlock" : "Запретить агентов доверия и биометрию");
+    cbRestrictions2.setText(isEn() ? "Disallow trust agents, biometric unlock and notifications on the lock screen" : "Запретить агентов доверия, разблокировку по биометрии и уведомления на экране блокировки");
     cbRestrictions2.setTextColor(Color.WHITE);
     cbRestrictions2.setTextSize(16f);
     
@@ -447,8 +485,9 @@ public class MainActivity extends Activity {
         int disabledFeatures = dpm.getKeyguardDisabledFeatures(adminName);
         boolean trustAgentsDisabled = (disabledFeatures & DevicePolicyManager.KEYGUARD_DISABLE_TRUST_AGENTS) != 0;
         boolean biometricsDisabled = (disabledFeatures & DevicePolicyManager.KEYGUARD_DISABLE_BIOMETRICS) != 0;
+		boolean secureNotificationsDisabled = (disabledFeatures & DevicePolicyManager.KEYGUARD_DISABLE_SECURE_NOTIFICATIONS) != 0;
 
-        cbRestrictions2.setChecked(trustAgentsDisabled && biometricsDisabled);
+        cbRestrictions2.setChecked(trustAgentsDisabled && biometricsDisabled && secureNotificationsDisabled);
     } else {
         cbRestrictions2.setChecked(false);
         cbRestrictions2.setAlpha(0.5f);
@@ -463,18 +502,20 @@ public class MainActivity extends Activity {
         int currentFeatures = dpm.getKeyguardDisabledFeatures(adminName);
         if (cbRestrictions2.isChecked()) {
             int newFeatures = currentFeatures | DevicePolicyManager.KEYGUARD_DISABLE_TRUST_AGENTS 
-                                            | DevicePolicyManager.KEYGUARD_DISABLE_BIOMETRICS;
+            | DevicePolicyManager.KEYGUARD_DISABLE_BIOMETRICS			        
+			| DevicePolicyManager.KEYGUARD_DISABLE_SECURE_NOTIFICATIONS;
             dpm.setKeyguardDisabledFeatures(adminName, newFeatures);
         } else {
             int newFeatures = currentFeatures & ~DevicePolicyManager.KEYGUARD_DISABLE_TRUST_AGENTS 
-                                             & ~DevicePolicyManager.KEYGUARD_DISABLE_BIOMETRICS;
+            & ~DevicePolicyManager.KEYGUARD_DISABLE_BIOMETRICS
+			& ~DevicePolicyManager.KEYGUARD_DISABLE_SECURE_NOTIFICATIONS;
             dpm.setKeyguardDisabledFeatures(adminName, newFeatures);
         }
     });
     buttonBox.addView(cbRestrictions2);
-	}
+	}		
 		
-        CheckBox cbReboot = new CheckBox(this);
+		CheckBox cbReboot = new CheckBox(this);
 		cbReboot.setText(isEn() ? "Auto-reboot (30 minutes after screen off)" : "Авто-перезагрузка (30 мин после выкл экрана)");
 		cbReboot.setTextColor(Color.WHITE);
 		cbReboot.setTextSize(16f);
@@ -496,7 +537,7 @@ public class MainActivity extends Activity {
         rbParams.setMargins(0, 0, 0, 32);
         cbReboot.setLayoutParams(rbParams);
         buttonBox.addView(cbReboot);
-                
+	                
         for (String a : actions) {
             Button b = new Button(this);
             b.setText(a);
@@ -958,8 +999,8 @@ public class MainActivity extends Activity {
 
 
    
-    private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки.\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Не используйте другие типы блокировки, например графический ключ. Также не используйте разблокировку по биометрии и отключите агентов доверия в настройках безопасности вашего телефона.\n\nТакже важно сообщить что сброс по лимиту попыток не удаляет раздел FRP основного профиля, который хранит ID аккаунтов. Если хотите не оставлять следов от ваших Google аккаунтов, рекомендуется хранить их только в рабочих профилях, которые не могут быть завязаны на FRP. В остальных случаях будьте аккуратны и не привязывайте бекапы и важные данные к ним, также убедитесь что физического доступа к сим-карте недостаточно для получения контроля над ними, проще говоря не привязывайте их к номеру телефона.\n\nЕсли выдадить этому приложению права Device Owner, оно сможет отключить FRP.";
-	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded.\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Don't use other lock types, such as pattern locks. Also, don't use biometric unlock and please disable trust agents in your device security settings.\n\nIt is also important to inform that a reset by attempt limit does not delete the FRP section of the main profile, which stores account IDs. If you want not to leave traces of your Google accounts, it is recommended to store them only in work profiles, which cannot be linked to FRP. In other cases, be careful and do not link backups and important data to them, also make sure that physical access to the SIM card is not enough to gain control over them, simply put do not link them to a phone number.\n\nIf grant this app Device Owner rights, it can disable FRP.";
+    private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки (обычно попытка неверная попытка засчитывается если введено 4 или более символов).\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Не используйте другие типы блокировки, например графический ключ. Также не используйте разблокировку по биометрии и отключите агентов доверия в настройках безопасности вашего телефона.\n\nТакже важно сообщить что сброс по лимиту попыток не удаляет раздел FRP основного профиля, который хранит ID аккаунтов. Если хотите не оставлять следов от ваших Google аккаунтов, рекомендуется хранить их только в рабочих профилях, которые не могут быть завязаны на FRP. В остальных случаях будьте аккуратны и не привязывайте бекапы и важные данные к ним, также убедитесь что физического доступа к сим-карте недостаточно для получения контроля над ними, проще говоря не привязывайте их к номеру телефона.\n\nЕсли выдадить этому приложению права Device Owner, оно сможет отключить FRP.";
+	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded (typically, an incorrect attempt is counted if 4 or more characters are entered).\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Don't use other lock types, such as pattern locks. Also, don't use biometric unlock and please disable trust agents in your device security settings.\n\nIt is also important to inform that a reset by attempt limit does not delete the FRP section of the main profile, which stores account IDs. If you want not to leave traces of your Google accounts, it is recommended to store them only in work profiles, which cannot be linked to FRP. In other cases, be careful and do not link backups and important data to them, also make sure that physical access to the SIM card is not enough to gain control over them, simply put do not link them to a phone number.\n\nIf grant this app Device Owner rights, it can disable FRP.";
 	
     private static final String TEXT_ERROR = "Возникла ошибка:\nпамять приложения была очищена либо состояние пакета изменено некорректно";
     private static final String TEXT_ERROR_EN = "An error occurred:\nthe application data was cleared or the package state was modified incorrectly";
