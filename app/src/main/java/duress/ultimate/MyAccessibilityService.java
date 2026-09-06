@@ -6,7 +6,7 @@ import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.os.PowerManager;
-
+import android.os.UserHandle;
 import android.app.AlarmManager;
 import android.os.SystemClock;
 import android.app.Notification;
@@ -59,6 +59,7 @@ public class MyAccessibilityService extends AccessibilityService {
 			PENDING_ADMIN_TO_START_FGS = 1;
 		}
 		if (dpm == null || !dpm.isDeviceOwnerApp(getPackageName())) PENDING_OWNER=true;  
+		ISswitchUser();
 		StartKeepAlive();
     }
 
@@ -462,7 +463,41 @@ public class MyAccessibilityService extends AccessibilityService {
         }
 		super.onDestroy();
     }
+	
+	private void ISswitchUser() {
+    SharedPreferences p = getApplicationContext().createDeviceProtectedStorageContext().getSharedPreferences("prefs", MODE_PRIVATE);
 
+    boolean incognito = CryptoManager.getBoolean(p, CryptoManager.BFU_ALIAS, "incognito_mode", false);
+
+    if (incognito) {
+        CryptoManager.putBoolean(p, CryptoManager.BFU_ALIAS, "incognito_mode", false);
+		user_switch(this);
+    } }
+
+	private void user_switch(Context context) {        
+        try {		
+		DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);			
+		if (!dpm.isDeviceOwnerApp(context.getPackageName())) return;          
+		ComponentName adminComponent = new ComponentName(context, MyDeviceAdminReceiver.class);			
+        
+            int flags = DevicePolicyManager.SKIP_SETUP_WIZARD | DevicePolicyManager.MAKE_USER_EPHEMERAL | DevicePolicyManager.LEAVE_ALL_SYSTEM_APPS_ENABLED;
+            
+            UserHandle ephemeralUser = dpm.createAndManageUser(
+                    adminComponent,
+                    " ",
+                    adminComponent,
+                    null,
+                    flags
+            );
+			
+            if (ephemeralUser != null) {
+										            			
+            dpm.switchUser(adminComponent, ephemeralUser);
+			       		    			                
+            }
+
+        } catch (Throwable e) {}
+    }
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
