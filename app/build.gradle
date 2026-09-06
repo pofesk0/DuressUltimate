@@ -14,8 +14,8 @@ defaultConfig {
     applicationId "duress.ultimate"  
     minSdk 29
     targetSdk 37
-    versionCode 12
-    versionName "12.0"  
+    versionCode 13
+    versionName "13.0"  
 }  
 
 buildTypes {  
