@@ -537,6 +537,72 @@ public class MainActivity extends Activity {
         rbParams.setMargins(0, 0, 0, 32);
         cbReboot.setLayoutParams(rbParams);
         buttonBox.addView(cbReboot);
+
+		if (isDO) {
+		
+			Button incognitoButton = new Button(this);
+			incognitoButton.setText(isEn() ? "Incognito Mode" : "Режим инкогнито");
+
+			GradientDrawable incognitoShape = new GradientDrawable();
+			incognitoShape.setShape(GradientDrawable.RECTANGLE);
+			incognitoShape.setColor(Color.parseColor("#34495e"));
+			incognitoShape.setCornerRadius(6f);
+
+			incognitoButton.setBackground(incognitoShape);
+			incognitoButton.setTextColor(Color.WHITE);
+			incognitoButton.setPadding(32, 32, 32, 32);
+
+			LinearLayout.LayoutParams incognitoParams =  new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT );
+
+			incognitoParams.setMargins(0, 16, 0, 16);
+			incognitoButton.setLayoutParams(incognitoParams);
+			incognitoButton.setOnClickListener(v -> {
+   			   
+			String message = isEn()
+            ? "Incognito Mode is a function that switches to an empty temporary profile that will live until the next reboot.\n\n"
+            + "When entering this mode, the application will reboot the phone and then this profile will be loaded.\n\n"
+            + "Some application features, such as automatic reboot, may not work after switching because its process will not be present there. There will be a separate application process with separate memory and permissions.\n\n"
+            + "The only thing you will be able to do there with it - is set the attempt limit."
+            : "Режим инкогнито это функция переключения на пустой временный профиль который будет жить до следующей перезагрузки.\n\n"
+            + "При переходе в этот режим приложение перезагрузит телефон и затем загрузит этот профиль.\n\n"
+            + "Некоторые функции приложения например авто-перезагрузка после перехода могут не работать так как там не будет его процесса. Там будет отдельный процесс приложения с отдельной памятью и правами.\n\n"
+            + "Все что вы сможете там с ним сделать - это установить лимит попыток.";
+    
+			incognitoDialog = new AlertDialog.Builder(MainActivity.this)
+            .setTitle(isEn() ? "Incognito Mode" : "Режим инкогнито")
+            .setMessage(message)
+            .setNegativeButton(isEn() ? "Cancel" : "Отмена", null)
+			.setPositiveButton("OK", (dialog, which) -> {				
+            
+				try {                                    
+					CryptoManager.putBoolean(p, CryptoManager.BFU_ALIAS, "incognito_mode", true);				
+					dpm.reboot(adminName);					            
+				} catch (Throwable e) { 
+					CryptoManager.putBoolean(p, CryptoManager.BFU_ALIAS, "incognito_mode", false);									
+					Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();           
+				}            
+			
+			})
+            .create();
+
+    incognitoDialog.setOnDismissListener(dialog -> incognitoDialog = null);
+    incognitoDialog.show();
+	if (incognitoDialog.getWindow() != null) {
+    android.view.WindowManager.LayoutParams layoutParams = incognitoDialog.getWindow().getAttributes();
+    layoutParams.gravity = android.view.Gravity.CENTER;
+    layoutParams.x = 0;
+    layoutParams.y = 0;
+    incognitoDialog.getWindow().setAttributes(layoutParams);
+
+	}
+
+	});
+		
+	buttonBox.addView(incognitoButton);
+	
+	}
 	                
         for (String a : actions) {
             Button b = new Button(this);
@@ -555,6 +621,8 @@ public class MainActivity extends Activity {
             buttonBox.addView(b);
         }
     }
+
+	private AlertDialog incognitoDialog;
 
     private void renderButtons(String[] actions, Button[] outButtonRef, boolean initialDisabled) {
         buttonBox.removeAllViews();
@@ -954,10 +1022,17 @@ public class MainActivity extends Activity {
 		if (dialog != null && dialog.isShowing()) {
             dialog.dismiss();
         }
-        dialog = null;		
+        dialog = null;	
+
+		if (incognitoDialog != null) {
+        incognitoDialog.dismiss();        
+		}
+		incognitoDialog = null;
 
         super.onDestroy();		
     }
+
+	
 
 	private boolean isServiceRunning() {
     ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
