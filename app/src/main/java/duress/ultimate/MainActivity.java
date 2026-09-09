@@ -532,13 +532,52 @@ public class MainActivity extends Activity {
 				return;
 			} 
 			CryptoManager.putBoolean(p, CryptoManager.BFU_ALIAS, "auto_reboot", cbReboot.isChecked());
-		});
-		LinearLayout.LayoutParams rbParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        rbParams.setMargins(0, 0, 0, 32);
-        cbReboot.setLayoutParams(rbParams);
+		});		
         buttonBox.addView(cbReboot);
 
 		if (isDO) {
+
+			CheckBox cbUserSwitch = new CheckBox(this);
+			cbUserSwitch.setText(isEn() ? "Remove system user-switch button (this will not affect the Incognito Mode button)"
+            : "Убрать системную кнопку переключения пользователей (это не повлияет на кнопку режима инкогнито)");
+			cbUserSwitch.setTextColor(Color.WHITE);
+			cbUserSwitch.setTextSize(16f);
+
+           if (isDO) {
+            Bundle restrictions = dpm.getUserRestrictions(adminName);
+            boolean userSwitchDisabled = restrictions.getBoolean(UserManager.DISALLOW_USER_SWITCH, false);
+            cbUserSwitch.setChecked(userSwitchDisabled);
+		   } else {   
+			   cbUserSwitch.setChecked(false);    
+			   cbUserSwitch.setAlpha(0.5f);
+		   }
+
+			cbUserSwitch.setOnClickListener(v -> {    
+				if (!isDO) {       
+					cbUserSwitch.setChecked(false);      
+					showDeviceOwnerInstruction();        
+					return;  
+				}
+
+   
+				if (cbUserSwitch.isChecked()) {       
+					dpm.addUserRestriction(                
+						adminName,                
+						UserManager.DISALLOW_USER_SWITCH        
+					);
+   
+				} else {       
+					dpm.clearUserRestriction(              
+						adminName,              
+						UserManager.DISALLOW_USER_SWITCH        
+					);    
+				}
+			});
+
+			LinearLayout.LayoutParams usParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);    
+			usParams.setMargins(0, 0, 0, 32);       
+			cbUserSwitch.setLayoutParams(usParams);				
+			buttonBox.addView(cbUserSwitch);
 		
 			Button incognitoButton = new Button(this);
 			incognitoButton.setText(isEn() ? "Incognito Mode" : "Режим инкогнито");
