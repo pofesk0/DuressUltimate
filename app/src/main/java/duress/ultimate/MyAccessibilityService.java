@@ -2,6 +2,9 @@ package duress.ultimate;
 
 import android.media.AudioAttributes;
 import android.media.AudioFormat;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
+import android.os.Build;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.AudioTrack;
@@ -30,6 +33,8 @@ import android.view.accessibility.AccessibilityNodeInfo;
 
 public class MyAccessibilityService extends AccessibilityService {
 
+	private BroadcastReceiver usbReceiver;
+  
     private final int TYPE_SYSTEM_EXEMPTED = 1024;
 	private final int DEFAULT_VALUE = 1337;
 	
@@ -61,6 +66,18 @@ public class MyAccessibilityService extends AccessibilityService {
 		if (dpm == null || !dpm.isDeviceOwnerApp(getPackageName())) PENDING_OWNER=true;  
 		ISswitchUser();
 		StartKeepAlive();
+		if (usbReceiver == null) {
+        usbReceiver = new BroadcastReceiver() {
+			@Override
+			public void onReceive(Context context, Intent intent) {
+				if (!isInitialStickyBroadcast()) wiper.isUSBwipe(MyAccessibilityService.this);				
+			}
+		};
+        if (Build.VERSION.SDK_INT >= 33) {
+		registerReceiver(usbReceiver, new IntentFilter("android.hardware.usb.action.USB_STATE"),Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(usbReceiver, new IntentFilter("android.hardware.usb.action.USB_STATE"));
+        } }
     }
 
     private void setWipeLimit(int limit) {
@@ -460,6 +477,10 @@ public class MyAccessibilityService extends AccessibilityService {
                 audioTrack.release();
             } catch (Throwable ignored) {}
             audioTrack = null;
+        }
+		if (usbReceiver != null) {
+            try { unregisterReceiver(usbReceiver); } catch (Throwable ignored) {}
+			usbReceiver = null;
         }
 		super.onDestroy();
     }
