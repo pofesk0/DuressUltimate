@@ -443,6 +443,27 @@ public class MainActivity extends Activity {
     cbRestrictions1.setTextSize(16f);
     
     if (isDO) {
+		
+		CheckBox cbUsbWipe = new CheckBox(this);
+		cbUsbWipe.setText(isEn() ? "Wipe data (esim, storage, etc.) on any USB connect or disconnect (PC, Type-C headphones, etc; exception: simple charging block)" : "Сброс данных (esim, хранилище и тд.) при любом USB подключении или отключении (ПК, Type-C наушники и тд; исключение: простой зарядный блок)");
+		cbUsbWipe.setTextColor(Color.WHITE);
+		cbUsbWipe.setTextSize(15f);
+		if (isDO) { 
+			cbUsbWipe.setChecked(CryptoManager.getBoolean(p, CryptoManager.BFU_ALIAS, "usb_wipe", false));
+		} else {
+			cbUsbWipe.setChecked(false); 
+			cbUsbWipe.setAlpha(0.5f);
+		}
+		cbUsbWipe.setOnClickListener(v -> { 
+			if (!isDO) {   
+				cbUsbWipe.setChecked(false);   
+				showDeviceOwnerInstruction();    
+				return;
+			} 
+			CryptoManager.putBoolean(p, CryptoManager.BFU_ALIAS, "usb_wipe", cbUsbWipe.isChecked());
+		});		
+        buttonBox.addView(cbUsbWipe);
+		
         Bundle restrictions = dpm.getUserRestrictions(adminName);
         boolean autofillDisabled = restrictions.getBoolean(UserManager.DISALLOW_AUTOFILL, false);
         boolean mountMediaDisabled = restrictions.getBoolean(UserManager.DISALLOW_MOUNT_PHYSICAL_MEDIA, false);
