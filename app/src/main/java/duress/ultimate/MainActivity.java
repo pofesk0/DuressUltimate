@@ -559,7 +559,7 @@ public class MainActivity extends Activity {
 		if (isDO) {
 
 			CheckBox cbSafeBoot = new CheckBox(this);
-			cbSafeBoot.setText(isEn() ? "Disallow Safe Mode (to make bypassing app functioning harder)"
+			cbSafeBoot.setText(isEn() ? "Disallow Safe Mode (to make it harder to bypass app functioning)"
 			: "Запретить безопасный режим (чтобы усложнить обход действия приложения)");
 			cbSafeBoot.setTextColor(Color.WHITE);
 			cbSafeBoot.setTextSize(15f);
