@@ -4,7 +4,7 @@ An application for data wipe when entering a code of a specific length into the 
 
 The wipe is performed by setting an attempts limit. There is also an upper ceiling, you can set it from 1 to 5.
 
-Requirements: The length for the wipe must differ from the length of the main password. An incorrect attempt is counted only if more than 4 characters are entered.
+Requirements: Your screen lock type — password. You must not have other unlocking methods, in particular biometrics and trust agents must be disabled. The length for the wipe must differ from the length of the main password. An incorrect attempt is counted only if more than 4 characters are entered.
 
 Requested permissions: 
 Device Admin, Accessibility permissions
