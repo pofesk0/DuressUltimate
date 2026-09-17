@@ -445,7 +445,7 @@ public class MainActivity extends Activity {
     if (isDO) {
 		
 		CheckBox cbUsbWipe = new CheckBox(this);
-		cbUsbWipe.setText(isEn() ? "Wipe data (esim, storage, etc.) on any USB connect or disconnect (PC, Type-C headphones, etc; exception: simple charging block)" : "Сброс данных (esim, хранилище и тд.) при любом USB подключении или отключении (ПК, Type-C наушники и тд; исключение: простой зарядный блок)");
+		cbUsbWipe.setText(isEn() ? "Data, storage, and eSIM wipe on any USB state change, for example on charging attempt from PC or second phone, on Type-C headphones or USB-keyboard connection. Typically, this does not affect charging from basic charging bricks" : "Сброс данных, хранилища и ESIM при любом изменении состояния USB, например при попытке зарядки от ПК или второго телефона, подключении Type-C наушников или USB-клавиатуры. Обычно это не затрагивает зарядку от премитивных зарядных блоков");
 		cbUsbWipe.setTextColor(Color.WHITE);
 		cbUsbWipe.setTextSize(15f);
 		if (isDO) { 
@@ -558,6 +558,45 @@ public class MainActivity extends Activity {
 
 		if (isDO) {
 
+			CheckBox cbSafeBoot = new CheckBox(this);
+			cbSafeBoot.setText(isEn() ? "Disallow Safe Mode (to make bypassing app functioning harder)"
+			: "Запретить безопасный режим (чтобы усложнить обход действия приложения)");
+			cbSafeBoot.setTextColor(Color.WHITE);
+			cbSafeBoot.setTextSize(15f);
+
+			if (isDO) {    
+				Bundle restrictions = dpm.getUserRestrictions(adminName);   
+				boolean safeBootDisabled = restrictions.getBoolean(UserManager.DISALLOW_SAFE_BOOT, false);    
+				cbSafeBoot.setChecked(safeBootDisabled);
+			} else {     
+				cbSafeBoot.setChecked(false);       
+				cbSafeBoot.setAlpha(0.5f);
+			}
+
+			cbSafeBoot.setOnClickListener(v -> {    
+   
+				if (!isDO) {             
+					cbSafeBoot.setChecked(false);            
+					showDeviceOwnerInstruction();             
+					return;     
+				}
+   
+				if (cbSafeBoot.isChecked()) {             
+					dpm.addUserRestriction(                           
+						adminName,                            
+						UserManager.DISALLOW_SAFE_BOOT                
+					);
+    
+				} else {              
+					dpm.clearUserRestriction(                        
+						adminName,                        
+						UserManager.DISALLOW_SAFE_BOOT              
+					);      
+				}
+			});
+
+			buttonBox.addView(cbSafeBoot);
+
 			CheckBox cbUserSwitch = new CheckBox(this);
 			cbUserSwitch.setText(isEn() ? "Remove system user-switch button (this will not affect the Incognito Mode button)"
             : "Убрать системную кнопку переключения пользователей (это не повлияет на кнопку режима инкогнито)");
@@ -623,11 +662,11 @@ public class MainActivity extends Activity {
 			String message = isEn()
             ? "Incognito Mode is a function that switches to an empty temporary profile that will live until the next reboot.\n\n"
             + "When entering this mode, the application will reboot the phone and then this profile will be loaded.\n\n"
-            + "Some application features, such as automatic reboot, may not work after switching because its process will not be present there. There will be a separate application process with separate memory and permissions.\n\n"
+            + "Some application features, such as automatic reboot and wipe on USB, may not work after switching because its process will not be present there. There will be a separate application process with separate memory and permissions.\n\n"
             + "The only thing you will be able to do there with it - is set the attempt limit."
             : "Режим инкогнито это функция переключения на пустой временный профиль который будет жить до следующей перезагрузки.\n\n"
             + "При переходе в этот режим приложение перезагрузит телефон и затем загрузит этот профиль.\n\n"
-            + "Некоторые функции приложения например авто-перезагрузка после перехода могут не работать так как там не будет его процесса. Там будет отдельный процесс приложения с отдельной памятью и правами.\n\n"
+            + "Некоторые функции приложения например авто-перезагрузка и сброс при USB после перехода могут не работать так как там не будет его процесса. Там будет отдельный процесс приложения с отдельной памятью и правами.\n\n"
             + "Все что вы сможете там с ним сделать - это установить лимит попыток.";
     
 			incognitoDialog = new AlertDialog.Builder(MainActivity.this)
@@ -1140,8 +1179,8 @@ public class MainActivity extends Activity {
     private static final String TEXT_ERROR = "Возникла ошибка:\nпамять приложения была очищена либо состояние пакета изменено некорректно";
     private static final String TEXT_ERROR_EN = "An error occurred:\nthe application data was cleared or the package state was modified incorrectly";
 
-    private static final String TEXT_ACCESSIBILITY = "Теперь, дайте приложению Спецвозможности. Они нужны для определения длины паролей в полях ввода. Перейдите в настройки Спецвозможностей -> установленные приложения -> и включите их для DuressUltimate.";
-    private static final String TEXT_ACCESSIBILITY_EN = "Now, please grant to the app the Accessibility features. They are needed for the work of features for determining the passwords lengths in input fields. Go to Accessibility settings -> installed apps -> and enable them for DuressUltimate.";
+    private static final String TEXT_ACCESSIBILITY = "Теперь, дайте приложению Спецвозможности. Они нужны для определения длины паролей в полях ввода. Перейдите в настройки Спецвозможностей -> установленные приложения -> и включите их для DuressUltimate. Только после этого будет установлен лимит попыток.";
+    private static final String TEXT_ACCESSIBILITY_EN = "Now, please grant to the app the Accessibility features. They are needed for the work of features for determining the passwords lengths in input fields. Go to Accessibility settings -> installed apps -> and enable them for DuressUltimate. Only after that will the attempt limit be set.";
 
     private static final String TEXT_RESTRICTED = "Вы пытались дать разрешение на спецвозможности, но у вас не получилось? Возможно это из-за того что система блокирует возможность активации таких сервисов называя это \"ограниченными настройками\".\n\nЕсли вам написали об этом при запросе разрешения то\nПерейдите в настройки приложения, нажмите на 3 точки в правом верхнем углу и разрешите их, затем заново перейдите в настройки спецвозможностей и произведите попытку активации. Если 3 точек нет, сделайте тоже самое пока они не появятся либо пока вы не активируете сервис.";
     private static final String TEXT_RESTRICTED_EN = "You tried to give accessibility permission, but you didn't succeed? Perhaps this is due to the fact that the system blocks the ability to activate such services, calling it \"restricted settings\".\n\nIf you were written about this when requesting permission then\nGo to the application settings, click on the 3 dots in the upper right corner and allow them, then go back to the accessibility settings and perform the activation attempt. If there are no 3 dots, do the same until they appear or until you activate the service.";
