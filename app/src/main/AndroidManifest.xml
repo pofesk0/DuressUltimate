@@ -1,8 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="duress.ultimate">
 	
-	<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />    
-	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" /> 		
 	
     <application
@@ -109,7 +108,6 @@
 		<activity
 			android:exported="false"			
 			android:launchMode="singleTask"
-			android:turnScreenOn="true"			
 			android:screenOrientation="portrait"
 			android:resizeableActivity="false"
 			android:excludeFromRecents="true"			
