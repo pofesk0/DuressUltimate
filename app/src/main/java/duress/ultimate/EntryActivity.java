@@ -36,10 +36,11 @@ public class EntryActivity extends Activity {
 		}
 	}
 
-	private void navigateToMainActivity() {        
-        isLogged=true;
-		startActivity(new Intent(this, MainActivity.class));
-        finish();
-    }
+	private void navigateToMainActivity() {           
+		isLogged = true;
+		startActivity(new Intent(this, MainActivity.class));   	 
+		finish();
+	}
+
 
 }
