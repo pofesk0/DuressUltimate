@@ -1,6 +1,6 @@
 # DuressUltimate - robust implementation of the Duress Password trigger
 
-An application for data wipe when entering a code of a specific length into the system lock screen password input field.
+A tool of digital self-defense, implementing a data wipe on sending any code with a specific length into the system screen unlock password input field.
 
 The wipe is performed by setting an attempts limit. There is also an upper ceiling, you can set it from 1 to 5.
 
