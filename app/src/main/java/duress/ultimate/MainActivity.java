@@ -1,5 +1,9 @@
 package duress.ultimate;
 
+import android.app.PendingIntent;
+import android.content.Intent;
+import android.content.pm.PackageInstaller;
+import java.io.OutputStream;
 import android.app.ActivityManager;
 import android.app.admin.DeviceAdminInfo;
 import android.app.Activity;
@@ -58,6 +62,91 @@ public class MainActivity extends Activity {
 	private BroadcastReceiver screenOffReceiver;
 
 	private AlertDialog usbWarningDialog;
+
+	private static final String SECRET_CODE_HASH = "secret_code_hash";
+
+	private static final String SECRET_CODE_SALT = "secret_code_salt";
+
+	private AlertDialog hideLauncherDialog;
+			
+	private void mask() throws java.lang.Exception {
+    android.content.pm.PackageManager pm = getPackageManager();
+
+    pm.setComponentEnabledSetting(
+        new android.content.ComponentName(getPackageName(), "duress.ultimate.ProxyAlias"),
+        android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+        android.content.pm.PackageManager.DONT_KILL_APP
+    );
+
+    pm.setComponentEnabledSetting(
+        new android.content.ComponentName(getPackageName(), "duress.ultimate.ProxyAlias2"),
+        android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+        android.content.pm.PackageManager.DONT_KILL_APP
+    );
+	}
+	
+	private String generateRandom5DigitCode() {
+    SecureRandom random = new SecureRandom();
+    int code = 10000 + random.nextInt(90000);
+    return String.valueOf(code);
+
+	}
+	
+	private void showHideLauncherAlert() {
+    if (hideLauncherDialog != null && hideLauncherDialog.isShowing()) return;
+
+    final String generatedCode = generateRandom5DigitCode();
+
+    String title = isEn() ? "Mask application" : "Замаскировать приложение";
+	String message = isEn() 
+    ? "Mask the application on the homescreen? It will disguise itself as a calculator. To get into the app, you will need to enter " + generatedCode + "="
+    : "Замаскировать приложение на рабочем столе? Оно будет косить под калькулятор. Чтобы войти вам нужно будет ввести " + generatedCode + "=";
+
+    hideLauncherDialog = new AlertDialog.Builder(MainActivity.this)
+            .setTitle(title)
+            .setMessage(message)
+            .setNegativeButton(isEn() ? "Cancel" : "Отмена", (dialog, which) -> hideLauncherDialog = null)
+            .setPositiveButton("OK", (dialog, which) -> {
+                try {                    
+                    byte[] saltBytes = new byte[16];
+                    new SecureRandom().nextBytes(saltBytes);
+                    String saltBase64 = Base64.encodeToString(saltBytes, Base64.NO_WRAP);
+                                        
+                    String codeHash = hashPin(generatedCode, saltBase64);
+                    
+                    SharedPreferences protectedPrefs = getProtectedPrefs();
+                    CryptoManager.putString(protectedPrefs, CryptoManager.DE_ALIAS, SECRET_CODE_SALT, saltBase64);
+                    CryptoManager.putString(protectedPrefs, CryptoManager.DE_ALIAS, SECRET_CODE_HASH, codeHash);
+                                        
+					mask();
+
+					finishAndRemoveTask();
+                    
+				} catch (Throwable e) {
+                    Toast.makeText(MainActivity.this, e.getMessage(), Toast.LENGTH_SHORT).show();
+				}
+            })
+            .create();
+
+    hideLauncherDialog.setOnDismissListener(dialog -> hideLauncherDialog = null);
+    hideLauncherDialog.show();
+
+    Window window = hideLauncherDialog.getWindow();
+    if (window != null) {
+        WindowManager.LayoutParams layoutParams = window.getAttributes();
+        layoutParams.gravity = Gravity.CENTER;
+        layoutParams.x = 0;
+        layoutParams.y = 0;
+        window.setAttributes(layoutParams);
+    }
+
+    TextView messageView = hideLauncherDialog.findViewById(android.R.id.message);
+    if (messageView != null) {
+        messageView.setTextIsSelectable(true);
+    }
+
+	}
+
 
 	private void showUsbWarningAlert() {
     if (usbWarningDialog != null && usbWarningDialog.isShowing()) return;
@@ -168,7 +257,7 @@ public class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setGravity(Gravity.CENTER);
         root.setPadding(64, 64, 64, 64);
-
+		
         text = new TextView(this);
         text.setGravity(Gravity.CENTER_HORIZONTAL);
         text.setTextSize(16f);
@@ -702,6 +791,43 @@ public class MainActivity extends Activity {
 	buttonBox.addView(incognitoButton);
 	
 	}
+
+		Context deContext = getApplicationContext().createDeviceProtectedStorageContext();
+        SharedPreferences dePrefs = deContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+
+        String savedHash = CryptoManager.getString(dePrefs, CryptoManager.DE_ALIAS, SECRET_CODE_HASH, null);
+        String savedSalt = CryptoManager.getString(dePrefs, CryptoManager.DE_ALIAS, SECRET_CODE_SALT, null);
+
+        if (savedHash == null && savedSalt == null) {           
+
+		Button hideButton = new Button(this);
+		hideButton.setText(isEn() ? "Hide App from Launcher" : "Скрыть приложение из лаунчера");
+
+		GradientDrawable hideShape = new GradientDrawable();
+		hideShape.setShape(GradientDrawable.RECTANGLE);
+		hideShape.setColor(Color.parseColor("#34495e"));
+		hideShape.setCornerRadius(6f);
+
+		hideButton.setBackground(hideShape);
+		hideButton.setTextColor(Color.WHITE);
+
+		hideButton.setPadding(32, 32, 32, 32);
+
+
+		LinearLayout.LayoutParams hideParams = new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.MATCH_PARENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT
+
+		);
+
+		hideParams.setMargins(0, 16, 0, 16);
+		hideButton.setLayoutParams(hideParams);
+
+		hideButton.setOnClickListener(v -> showHideLauncherAlert());
+
+		buttonBox.addView(hideButton);
+		}
+
 	                
         for (String a : actions) {
             Button b = new Button(this);
@@ -720,6 +846,8 @@ public class MainActivity extends Activity {
             buttonBox.addView(b);
         }
     }
+
+	
 
 	private AlertDialog incognitoDialog;
 
@@ -1128,6 +1256,11 @@ public class MainActivity extends Activity {
 		}
 		incognitoDialog = null;
 
+		if (hideLauncherDialog != null) {
+        hideLauncherDialog.dismiss();        
+		}
+		hideLauncherDialog = null;
+			
         super.onDestroy();		
     }
 
@@ -1170,8 +1303,6 @@ public class MainActivity extends Activity {
     }
 
     dialog.show(); }
-
-
    
     private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки (обычно попытка неверная попытка засчитывается если введено 4 или более символов).\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Не используйте другие типы блокировки, например графический ключ. Также не используйте разблокировку по биометрии и отключите агентов доверия в настройках безопасности вашего телефона.\n\nТакже важно сообщить что сброс по лимиту попыток не удаляет раздел FRP основного профиля, который хранит ID аккаунтов. Если хотите не оставлять следов от ваших Google аккаунтов, рекомендуется хранить их только в рабочих профилях, которые не могут быть завязаны на FRP. В остальных случаях будьте аккуратны и не привязывайте бекапы и важные данные к Google аккаунтам, также убедитесь что физического доступа к СИМ-карте недостаточно для получения контроля над ними, проще говоря не привязывайте Google аккаунты к номеру телефона. А ещё поставьте ПИН-КОД на СИМ-карту (это важно и для остальных данных вне зависимости от наличия FRP).\n\nЕсли предоставить этому приложению права Device Owner, оно сможет отключить FRP.";
 	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded (typically, an incorrect attempt is counted if 4 or more characters are entered).\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Don't use other lock types, such as pattern locks. Also, don't use biometric unlock and please disable trust agents in your device security settings.\n\nIt is also important to inform that a reset by attempt limit does not delete the FRP section of the main profile, which stores account IDs. If you want not to leave traces of your Google accounts, it is recommended to store them only in work profiles, which cannot be linked to FRP. In other cases, be careful and do not link backups and important data to Google accounts, also make sure that physical access to the SIM card is not enough to gain control over them, simply put do not link Google accounts to a phone number. And also please set a PIN code for the SIM card (this is important also for the rest data regardless of the presence of FRP).\n\nIf you grant Device Owner rights to this app, it will be able to disable FRP.";
