@@ -1,4 +1,4 @@
-Duress Ultimate - A tool of digital self-defense, implementing a data wipe on sending any code with a specific length into the system screen unlock password input field.
+Duress Ultimate - A tool for digital self-defense, implementing a data wipe on sending any code with a specific length into the system screen lock password input field.
 
 The wipe is performed by setting an attempts limit. There is also an upper ceiling, you can set it from 1 to 5.
 
