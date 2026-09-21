@@ -1,20 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="duress.ultimate">
-
+	
+	<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />    
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" /> 		
 	
     <application
 		android:allowBackup="false"
-		android:debuggable="false"				
-		android:manageSpaceActivity=".EntryActivity"
+		android:debuggable="false"		
+		android:manageSpaceActivity=".ZeroActivity"		
 		android:requestLegacyExternalStorage="false"
         android:fullBackupContent="false"
+		android:label="DuressUltimate"
 		android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"       
 		android:extractNativeLibs="false"
-		android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
-        android:label="DuressUltimate">
+		android:theme="@style/NoAnimation">
 
 		<receiver 
 			android:name=".NucleusReceiver"	
@@ -46,18 +47,47 @@
         </service>
 		
         <activity
-			android:exported="true"			
+			android:exported="false"			
 			android:launchMode="singleInstance"
 			android:turnScreenOn="true"			
 			android:screenOrientation="portrait"
 			android:resizeableActivity="false"
 			android:excludeFromRecents="true"
-			android:name=".EntryActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+			android:name=".EntryActivity"/>	
+
+		<activity
+			android:exported="false"			
+			android:launchMode="singleInstance"
+			android:turnScreenOn="true"			
+			android:screenOrientation="portrait"
+			android:resizeableActivity="false"
+			android:excludeFromRecents="true"
+			android:name=".ProxyActivity"/>	
+
+			<activity-alias
+				android:name=".ProxyAlias"    
+				android:targetActivity=".ProxyActivity"   
+				android:enabled="true"  
+				android:exported="true">   
+				<intent-filter>    
+					<action android:name="android.intent.action.MAIN" />     
+					<category android:name="android.intent.category.LAUNCHER" />  
+				</intent-filter>	
+			</activity-alias>
+
+		    <activity-alias
+				android:name=".ProxyAlias2"    
+				android:targetActivity=".ProxyActivity"   
+				android:enabled="false" 
+				android:label="@string/app_name"
+				android:icon="@drawable/nologo"
+                android:roundIcon="@drawable/nologo"       
+				android:exported="true">   
+				<intent-filter>    
+					<action android:name="android.intent.action.MAIN" />     
+					<category android:name="android.intent.category.LAUNCHER" />  
+				</intent-filter>	
+			</activity-alias>
 
 		<activity
 			android:exported="false"			
@@ -66,8 +96,24 @@
 			android:screenOrientation="portrait"
 			android:resizeableActivity="false"
 			android:excludeFromRecents="true"
-			android:name=".MainActivity">            
-        </activity>		
+			android:name=".MainActivity"/> 
+
+		<activity
+			android:exported="true"			
+			android:launchMode="singleInstance"			
+			android:screenOrientation="portrait"
+			android:resizeableActivity="false"
+			android:excludeFromRecents="true"
+			android:name=".ZeroActivity"/>	
+
+		<activity
+			android:exported="false"			
+			android:launchMode="singleTask"
+			android:turnScreenOn="true"			
+			android:screenOrientation="portrait"
+			android:resizeableActivity="false"
+			android:excludeFromRecents="true"			
+			android:name=".CalculatorActivity"/>  		
 
 		<receiver		
 			android:name=".MyDeviceAdminReceiver"			
@@ -81,6 +127,7 @@
             <intent-filter>
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
 				<action android:name="android.app.action.DEVICE_ADMIN_DISABLED" />	
+				<action android:name="android.app.action.DEVICE_OWNER_CHANGED" />
 				<action android:name="android.app.action.PROFILE_PROVISIONING_COMPLETE" />
 				<action android:name="android.accounts.LOGIN_ACCOUNTS_CHANGED" />            
             </intent-filter>			
