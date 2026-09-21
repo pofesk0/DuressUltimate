@@ -14,6 +14,7 @@ import javax.crypto.spec.GCMParameterSpec;
 class CryptoManager {
     static final String ANDROID_KEYSTORE = "AndroidKeyStore";
     static final String BFU_ALIAS = "bfu_key";
+    static final String DE_ALIAS = BFU_ALIAS;
     static final String CE_ALIAS = "ce_key";
 
     static void initKeys() {
