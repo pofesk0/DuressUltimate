@@ -20,7 +20,7 @@ What is the difference between DuressUltimate and the Duress project? The origin
 
 What is the difference between DuressUltimate and the Sentry project? Sentry does not have a dynamic limit. It does not change when entering a specific length and is set as fixed. For example if you set a limit of 3 attempts, this is not the upper ceiling, but the limit itself. You need to make a mistake 3 times to wipe the data. Here, you only need to enter a code of a specific length, and you don't need to lower the upper ceiling.
 
-What is the Duress Ultimate project for? To protect data from access by third parties demanding you to enter the password. When walking on the street, especially near forest areas, and when visiting airports, it is recommended to keep this application turned on, especially if you are in regions where human rights are not protected. Coercion can affect everyone. It’s no joke.
+What is the DuressUltimate project for? To protect data from access by third parties demanding you to enter the password. Before going outside if you take your phone it is recommended to turn on this app. Generally something bad happens when you do not expect it. It is necessary to always have the ability to fight back. Wherever you live and whoever you are, it is necessary to protect personal data. It can be used against you even if your range of interests is limited to watching the weather.
 
 [🏷️ Releases](https://github.com/pofesk0/DuressUltimate/releases/latest)
 
