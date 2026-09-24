@@ -1,6 +1,7 @@
 package duress.ultimate;
 
 import android.app.PendingIntent;
+import android.content.pm.ApplicationInfo;
 import android.content.Intent;
 import android.content.pm.PackageInstaller;
 import java.io.OutputStream;
@@ -49,6 +50,9 @@ public class MainActivity extends Activity {
     private static final String APP_PIN_HASH = "app_pin_hash";
     private static final String APP_PIN_SALT = "app_pin_salt";
     private static final String CLOSE_WARNINGS = "close_warnings";
+
+	private AlertDialog hideAppsDialog;
+	private AlertDialog hideAppsErrorDialog;
 
     private TextView text;
 	private AlertDialog dialog;
@@ -493,7 +497,7 @@ public class MainActivity extends Activity {
         ? "Disallow camera and screenshots"
         : "Запретить камеру и скриншоты");
         cbCameraAndCapture.setTextColor(Color.WHITE);
-        cbCameraAndCapture.setTextSize(15f);
+        cbCameraAndCapture.setTextSize(16f);
 
         boolean isCamDisabled = false;
         boolean isScrDisabled = false;
@@ -534,9 +538,9 @@ public class MainActivity extends Activity {
     if (isDO) {
 		
 		CheckBox cbUsbWipe = new CheckBox(this);
-		cbUsbWipe.setText(isEn() ? "Data, storage, and eSIM wipe on any USB state change, for example on charging attempt from PC or second phone, on Type-C headphones or USB-keyboard connection. Typically, this does not affect charging from basic charging bricks" : "Сброс данных, хранилища и ESIM при любом изменении состояния USB, например при попытке зарядки от ПК или второго телефона, подключении Type-C наушников или USB-клавиатуры. Обычно это не затрагивает зарядку от премитивных зарядных блоков");
+		cbUsbWipe.setText(isEn() ? "Data, storage, and eSIM wipe on any USB state change, for example on charging from PC or second phone, on Type-C headphones or USB-keyboard connection. Typically, this does not affect charging from basic charging bricks" : "Сброс данных, хранилища и ESIM при любом изменении состояния USB, например при зарядке от ПК или второго телефона, подключении Type-C наушников или USB-клавиатуры. Обычно это не затрагивает зарядку от премитивных зарядных блоков");
 		cbUsbWipe.setTextColor(Color.WHITE);
-		cbUsbWipe.setTextSize(15f);
+		cbUsbWipe.setTextSize(16f);
 		if (isDO) { 
 			cbUsbWipe.setChecked(CryptoManager.getBoolean(p, CryptoManager.BFU_ALIAS, "usb_wipe", false));
 		} else {
@@ -651,7 +655,7 @@ public class MainActivity extends Activity {
 			cbSafeBoot.setText(isEn() ? "Disallow Safe Mode (to make it harder to bypass app functioning)"
 			: "Запретить безопасный режим (чтобы усложнить обход действия приложения)");
 			cbSafeBoot.setTextColor(Color.WHITE);
-			cbSafeBoot.setTextSize(15f);
+			cbSafeBoot.setTextSize(16f);
 
 			if (isDO) {    
 				Bundle restrictions = dpm.getUserRestrictions(adminName);   
@@ -801,7 +805,7 @@ public class MainActivity extends Activity {
         if (savedHash == null && savedSalt == null) {           
 
 		Button hideButton = new Button(this);
-		hideButton.setText(isEn() ? "Hide App from Launcher" : "Скрыть приложение из лаунчера");
+		hideButton.setText(isEn() ? "App masking" : "Маскировка приложения");
 
 		GradientDrawable hideShape = new GradientDrawable();
 		hideShape.setShape(GradientDrawable.RECTANGLE);
@@ -826,6 +830,32 @@ public class MainActivity extends Activity {
 		hideButton.setOnClickListener(v -> showHideLauncherAlert());
 
 		buttonBox.addView(hideButton);
+		}
+
+		if (isDO) {  
+			Button hideAppsButton = new Button(this);   
+			hideAppsButton.setText(isEn() ? "Hide apps" : "Скрыть приложения");
+  
+			GradientDrawable hideAppsShape = new GradientDrawable();    
+			hideAppsShape.setShape(GradientDrawable.RECTANGLE);    
+			hideAppsShape.setColor(Color.parseColor("#34495e"));   
+			hideAppsShape.setCornerRadius(6f);
+    
+			hideAppsButton.setBackground(hideAppsShape);    
+			hideAppsButton.setTextColor(Color.WHITE);   
+			hideAppsButton.setPadding(32, 32, 32, 32);
+   
+			LinearLayout.LayoutParams hideAppsParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT    
+			);
+    
+			hideAppsParams.setMargins(0, 16, 0, 16);    
+			hideAppsButton.setLayoutParams(hideAppsParams);
+    
+			hideAppsButton.setOnClickListener(v -> showHideAppsAlert());    
+			buttonBox.addView(hideAppsButton);
+			
 		}
 
 	                
@@ -1260,11 +1290,21 @@ public class MainActivity extends Activity {
         hideLauncherDialog.dismiss();        
 		}
 		hideLauncherDialog = null;
+
+		if (hideAppsDialog != null) {  
+			hideAppsDialog.dismiss();
+		}
+
+		hideAppsDialog = null;
+
+		if (hideAppsErrorDialog != null) {  
+			hideAppsErrorDialog.dismiss();
+		}
+
+		hideAppsErrorDialog = null;
 			
         super.onDestroy();		
-    }
-
-	
+    }	
 
 	private boolean isServiceRunning() {
     ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
@@ -1303,9 +1343,217 @@ public class MainActivity extends Activity {
     }
 
     dialog.show(); }
+
+	private volatile boolean hasUnsafeApps = false;	
+	private volatile boolean backgroundThreadFree = true;
+	private volatile boolean internalThreadFree = true;	
+	
+	private void showHideAppsAlert() {
+	if (!backgroundThreadFree || !internalThreadFree) {return;} else {Toast.makeText(this, isEn() ? "Loading..." : "Загрузка...", Toast.LENGTH_SHORT).show();}	
+    if (hideAppsDialog != null) return;
+	hideAppsDialog = new AlertDialog.Builder(this).create();	
+	
+    final DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+    final ComponentName adminName = new ComponentName(this, MyDeviceAdminReceiver.class);
+    final PackageManager pm = getPackageManager();
+    
+    LinearLayout container = new LinearLayout(this);
+    container.setOrientation(LinearLayout.VERTICAL);
+
+    TextView messageView = new TextView(this);
+    String message = isEn()
+            ? "Select apps to hide. Hiding apps disables them. Hiding some system apps can affect device performance. Apps most dangerous to hide are highlighted in red."
+            : "Выберите приложения для скрытия. Скрытие приложений отключает их. Скрытие некоторых системных приложений может повлиять на работоспособность устройства. Приложения скрытие которых наиболее опасно выделены красным.";
+    messageView.setText(message);
+    messageView.setTextIsSelectable(true);
+    messageView.setPadding(48, 32, 48, 16);
+    container.addView(messageView);
+
+    android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
+    int scrollHeight = (int) (metrics.heightPixels * 0.6f);
+
+    ScrollView scrollView = new ScrollView(this);
+    scrollView.setLayoutParams(new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, scrollHeight));
+
+    LinearLayout listLayout = new LinearLayout(this);
+    listLayout.setOrientation(LinearLayout.VERTICAL);
+    listLayout.setPadding(48, 0, 48, 16);
+    scrollView.addView(listLayout);
+    container.addView(scrollView);
+
+	LinearLayout unsafeLayout = new LinearLayout(this);
+    unsafeLayout.setOrientation(LinearLayout.VERTICAL);
+
+    TextView warningHeader = new TextView(this);
+    String warningText = isEn()
+            ? "Hiding these apps may be unsafe:"
+            : "Эти приложения может быть небезопасно скрывать:";
+    warningHeader.setText(warningText);
+    warningHeader.setTypeface(null, android.graphics.Typeface.BOLD);
+    warningHeader.setPadding(0, 32, 0, 16);
+    warningHeader.setTextColor(android.graphics.Color.RED);
+    unsafeLayout.addView(warningHeader);
+    
+    final java.util.List<CheckBox> checkBoxes = new java.util.ArrayList<>();
+    final java.util.List<String> packages = new java.util.ArrayList<>();
+    final java.util.List<Boolean> initialStates = new java.util.ArrayList<>();
+    final java.util.Map<String, CharSequence> labels = new java.util.HashMap<>();
+
+    hasUnsafeApps = false;	
+
+	backgroundThreadFree = false;	
+	new Thread(() -> {	
+	java.util.List<android.content.pm.ApplicationInfo> apps = pm.getInstalledApplications(PackageManager.MATCH_UNINSTALLED_PACKAGES | PackageManager.MATCH_DISABLED_COMPONENTS | PackageManager.MATCH_ALL | PackageManager.GET_META_DATA);
+    java.util.Collections.sort(apps, (a, b) -> pm.getApplicationLabel(a).toString().compareToIgnoreCase(pm.getApplicationLabel(b).toString()));
+	
+	for (android.content.pm.ApplicationInfo appInfo : apps) {
+        if (appInfo.packageName.equals(getPackageName())) continue;
+
+		boolean isPlatformSigned = pm.checkSignatures("android", appInfo.packageName) == PackageManager.SIGNATURE_MATCH;
+        boolean hasNoLogo = appInfo.icon == 0;
+		boolean isSettings = "com.android.settings".equals(appInfo.packageName);
+		boolean isSystemUid = appInfo.uid == android.os.Process.SYSTEM_UID;
+        boolean hasNoLaunchIntent = pm.getLaunchIntentForPackage(appInfo.packageName) == null;
+		boolean isSystemApp = (appInfo.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0;
+        String defaultIme = Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
+        boolean isIme = defaultIme != null && defaultIme.startsWith(appInfo.packageName + "/");
+		boolean isUnsafe = (isSystemApp || isPlatformSigned || isSystemUid) && (isSettings || isIme || hasNoLogo || hasNoLaunchIntent);		
+		
+        CharSequence label = pm.getApplicationLabel(appInfo);
+        labels.put(appInfo.packageName, label);
+
+		android.graphics.drawable.Drawable icon = pm.getApplicationIcon(appInfo);        
+
+		boolean hidden1;
+        try {
+            hidden1 = dpm.isApplicationHidden(adminName, appInfo.packageName);
+        } catch (Throwable e) {
+            hidden1 = false;
+        }
+
+		final boolean hidden = hidden1;
+					
+		runOnUiThread(() -> {
+
+        CheckBox cb = new CheckBox(this);
+        cb.setText(label + " [" + appInfo.packageName + "]");
+        cb.setTextSize(13f);
+        
+        int iconSize = (int) (24 * metrics.density);
+        icon.setBounds(0, 0, iconSize, iconSize);
+        cb.setCompoundDrawables(icon, null, null, null);
+        cb.setCompoundDrawablePadding((int) (8 * metrics.density));
+        		
+        cb.setChecked(hidden);
+
+		if (isUnsafe) {
+			cb.setButtonTintList(android.content.res.ColorStateList.valueOf(android.graphics.Color.RED));
+			cb.setTextColor(android.graphics.Color.RED);
+            unsafeLayout.addView(cb);
+            hasUnsafeApps = true;
+        } else {
+            listLayout.addView(cb);
+        }
+        
+        checkBoxes.add(cb);
+        packages.add(appInfo.packageName);
+        initialStates.add(hidden);				
+		});			
+	}
+	runOnUiThread(() -> {	
+	if (hasUnsafeApps) listLayout.addView(unsafeLayout);
+        		    
+    hideAppsDialog = new AlertDialog.Builder(this)
+            .setTitle(isEn() ? "Hide apps" : "Скрыть приложения")
+            .setView(container)
+		    .setCancelable(false)
+            .setNegativeButton(isEn() ? "Cancel" : "Отмена", (dialog, which) -> hideAppsDialog = null)
+            .setPositiveButton("OK", (dialog, which) -> {
+                java.util.List<String> failedPackages = new java.util.ArrayList<>();
+                java.util.List<String> failedReasons = new java.util.ArrayList<>();
+
+				java.util.List<Boolean> states = new java.util.ArrayList<>();
+				for (CheckBox cb : checkBoxes) {
+                states.add(cb.isChecked());
+				}
+
+				Toast.makeText(MainActivity.this, isEn() ? "Hiding..." : "Скрытие...", Toast.LENGTH_SHORT).show();
+				internalThreadFree=false;
+				new Thread(() -> {
+                for (int i = 0; i < checkBoxes.size(); i++) {
+                    String pkg = packages.get(i);
+                    boolean desiredHidden = states.get(i);           
+					boolean initialHidden = initialStates.get(i);
+
+                    if (desiredHidden != initialHidden) {
+                        try {
+                            boolean success = dpm.setApplicationHidden(adminName, pkg, desiredHidden);
+                            if (!success) {
+                                failedPackages.add(labels.get(pkg) + " (" + pkg + ")");
+                                failedReasons.add(isEn() ? "Unknown error" : "Неизвестная ошибка");
+                            }
+                        } catch (Throwable e) {
+                            failedPackages.add(labels.get(pkg) + " (" + pkg + ")");
+                            failedReasons.add(e.getMessage());
+                        }
+                    }
+                }
+
+                if (!failedPackages.isEmpty()) showHideAppsErrorAlert(failedPackages, failedReasons);
+                internalThreadFree=true;
+				}).start();
+				hideAppsDialog = null;
+            }).create();
+
+    hideAppsDialog.show();
+
+    Window window = hideAppsDialog.getWindow();
+    if (window != null) {
+        WindowManager.LayoutParams lp = window.getAttributes();
+        lp.gravity = Gravity.CENTER;
+        lp.x = 0;
+        lp.y = 0;
+        window.setAttributes(lp);
+    } });
+	backgroundThreadFree = true;	
+	}).start();
+	}
+
+	private void showHideAppsErrorAlert(java.util.List<String> failedPackages, java.util.List<String> failedReasons) {
+	runOnUiThread(() -> {	
+    StringBuilder sb = new StringBuilder();
+    sb.append(isEn() ? "Failed to hide the following apps:" : "Не удалось скрыть следующие приложения:").append("\n\n");
+    for (int i = 0; i < failedPackages.size(); i++) {
+        sb.append(failedPackages.get(i)).append(" — ").append(failedReasons.get(i)).append("\n");
+    }
+
+    hideAppsErrorDialog = new AlertDialog.Builder(this)
+            .setTitle(isEn() ? "Error" : "Ошибка")
+            .setMessage(sb.toString())
+		    .setCancelable(false)
+            .setPositiveButton("OK", (dialog, which) -> hideAppsErrorDialog = null)
+            .create();
+
+    hideAppsErrorDialog.show();
+
+    Window window = hideAppsErrorDialog.getWindow();
+    if (window != null) {
+        WindowManager.LayoutParams lp = window.getAttributes();
+        lp.gravity = Gravity.CENTER;
+        lp.x = 0;
+        lp.y = 0;
+        window.setAttributes(lp);
+    }
+
+    TextView msgView = hideAppsErrorDialog.findViewById(android.R.id.message);
+    if (msgView != null) {
+        msgView.setTextIsSelectable(true);
+    } });
+	}
    
-    private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки (обычно попытка неверная попытка засчитывается если введено 4 или более символов).\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Не используйте другие типы блокировки, например графический ключ. Также не используйте разблокировку по биометрии и отключите агентов доверия в настройках безопасности вашего телефона.\n\nТакже важно сообщить что сброс по лимиту попыток не удаляет раздел FRP основного профиля, который хранит ID аккаунтов. Если хотите не оставлять следов от ваших Google аккаунтов, рекомендуется хранить их только в рабочих профилях, которые не могут быть завязаны на FRP. В остальных случаях будьте аккуратны и не привязывайте бекапы и важные данные к Google аккаунтам, также убедитесь что физического доступа к СИМ-карте недостаточно для получения контроля над ними, проще говоря не привязывайте Google аккаунты к номеру телефона. А ещё поставьте ПИН-КОД на СИМ-карту (это важно и для остальных данных вне зависимости от наличия FRP).\n\nЕсли предоставить этому приложению права Device Owner, оно сможет отключить FRP.";
-	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded (typically, an incorrect attempt is counted if 4 or more characters are entered).\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Don't use other lock types, such as pattern locks. Also, don't use biometric unlock and please disable trust agents in your device security settings.\n\nIt is also important to inform that a reset by attempt limit does not delete the FRP section of the main profile, which stores account IDs. If you want not to leave traces of your Google accounts, it is recommended to store them only in work profiles, which cannot be linked to FRP. In other cases, be careful and do not link backups and important data to Google accounts, also make sure that physical access to the SIM card is not enough to gain control over them, simply put do not link Google accounts to a phone number. And also please set a PIN code for the SIM card (this is important also for the rest data regardless of the presence of FRP).\n\nIf you grant Device Owner rights to this app, it will be able to disable FRP.";
+    private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки (обычно попытка неверная попытка засчитывается если введено 4 или более символов).\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Не используйте другие типы блокировки, например графический ключ. Также не используйте разблокировку по биометрии и отключите агентов доверия в настройках безопасности вашего телефона.\n\nТакже важно сообщить что сброс по лимиту попыток не удаляет раздел FRP основного профиля, который хранит ID аккаунтов. Если хотите не оставлять следов от ваших Google аккаунтов, рекомендуется хранить их только в рабочих профилях, которые не могут быть завязаны на FRP. В остальных случаях будьте аккуратны и не привязывайте бекапы и важные данные к Google аккаунтам, также убедитесь что физического доступа к СИМ-карте недостаточно для получения контроля над ними, проще говоря не привязывайте Google аккаунты к номеру телефона. А ещё поставьте пин-код на сим-карту (это важно и для остальных данных вне зависимости от наличия FRP).\n\nЕсли предоставить этому приложению права Device Owner, оно отключит FRP.";
+	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded (typically, an incorrect attempt is counted if 4 or more characters are entered).\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Don't use other lock types, such as pattern locks. Also, don't use biometric unlock and please disable trust agents in your device security settings.\n\nIt is also important to inform that a reset by attempt limit does not delete the FRP section of the main profile, which stores account IDs. If you want not to leave traces of your Google accounts, it is recommended to store them only in work profiles, which cannot be linked to FRP. In other cases, be careful and do not link backups and important data to Google accounts, also make sure that physical access to the SIM card is not enough to gain control over them, simply put do not link Google accounts to a phone number. And also please set a PIN code for the SIM card (this is important also for the rest data regardless of the presence of FRP).\n\nIf you grant Device Owner rights to this app, it will disable FRP.";
 	
     private static final String TEXT_ERROR = "Возникла ошибка:\nпамять приложения была очищена либо состояние пакета изменено некорректно";
     private static final String TEXT_ERROR_EN = "An error occurred:\nthe application data was cleared or the package state was modified incorrectly";
