@@ -1,10 +1,13 @@
 package duress.ultimate;
 
 import android.media.AudioAttributes;
+import android.widget.Toast;
+import android.os.UserManager;
 import android.media.AudioFormat;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.os.Build;
+import android.os.BatteryManager;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.AudioTrack;
@@ -33,8 +36,10 @@ import android.view.accessibility.AccessibilityNodeInfo;
 
 public class MyAccessibilityService extends AccessibilityService {
 
+	private boolean lock = true;
+	
 	private BroadcastReceiver usbReceiver;
-  
+	  
     private final int TYPE_SYSTEM_EXEMPTED = 1024;
 	private final int DEFAULT_VALUE = 1337;
 	
@@ -51,7 +56,10 @@ public class MyAccessibilityService extends AccessibilityService {
         SharedPreferences p = getApplicationContext().createDeviceProtectedStorageContext().getSharedPreferences("prefs", Context.MODE_PRIVATE);
         return CryptoManager.getBoolean(p, CryptoManager.BFU_ALIAS, "auto_reboot", false);
     }
-    
+
+	private int isCharging = 0;
+	private BatteryManager batteryManager;
+		
     @Override
     public void onCreate() {
         super.onCreate();
@@ -59,18 +67,46 @@ public class MyAccessibilityService extends AccessibilityService {
         if (dpm != null && dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class))) {			
 			setWipeLimit(1);      			
 			PENDING_ADMIN_TO_START_FGS = 0;
+			UserManager userManager = (UserManager) getSystemService(Context.USER_SERVICE);
+			KeyguardManager keyguardManager = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+			if (userManager == null || !userManager.isUserUnlocked() || keyguardManager == null || (!keyguardManager.isDeviceSecure() && android.os.SystemClock.elapsedRealtime() < 140_000)) wiper.isBootWipe(this);						
+			SharedPreferences prefs = getApplicationContext().createDeviceProtectedStorageContext().getSharedPreferences("prefs", MODE_PRIVATE);
+            lock = dpm.getCurrentFailedPasswordAttempts() > CryptoManager.getInt(prefs, CryptoManager.BFU_ALIAS, "counter", 0);                         		
 			StartSilentKeepAlive();
 		} else {
 			PENDING_ADMIN_TO_START_FGS = 1;
 		}
+		
 		if (dpm == null || !dpm.isDeviceOwnerApp(getPackageName())) PENDING_OWNER=true;  
 		ISswitchUser();
 		StartKeepAlive();
 		if (usbReceiver == null) {
+		batteryManager = (BatteryManager) getSystemService(Context.BATTERY_SERVICE); 
+		isCharging = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS);    	
         usbReceiver = new BroadcastReceiver() {
 			@Override
-			public void onReceive(Context context, Intent intent) {
-				if (!isInitialStickyBroadcast()) wiper.isUSBwipe(MyAccessibilityService.this);				
+			public void onReceive(Context context, Intent intent) {												
+				
+				boolean connected = intent.getBooleanExtra("connected", true);
+                boolean configured = intent.getBooleanExtra("configured", true);
+				if (connected || configured) {
+					wiper.isUSBwipe(MyAccessibilityService.this);
+					return;
+				}
+
+				if (isInitialStickyBroadcast()) return; 
+
+				batteryManager = (BatteryManager) getSystemService(Context.BATTERY_SERVICE);		
+				if (isCharging != batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS)) {
+					wiper.isUSBwipe(MyAccessibilityService.this);
+					return;
+				}					
+
+				KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+				UserManager um = (UserManager) getSystemService(Context.USER_SERVICE);				
+				if ((um.isUserUnlocked() || android.os.SystemClock.elapsedRealtime() > 70_000) && km.isDeviceSecure() && km.isKeyguardLocked()) wiper.isUSBwipe(MyAccessibilityService.this);
+
+			
 			}
 		};
         if (Build.VERSION.SDK_INT >= 33) {
@@ -82,9 +118,12 @@ public class MyAccessibilityService extends AccessibilityService {
 
     private void setWipeLimit(int limit) {
         try {
-            DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
-            ComponentName adminName = new ComponentName(this, MyDeviceAdminReceiver.class);
+			if (lock) limit = 1; 
+			DevicePolicyManager dpm = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);            			
+			ComponentName adminName = new ComponentName(this, MyDeviceAdminReceiver.class);
             dpm.setMaximumFailedPasswordsForWipe(adminName, limit);
+			SharedPreferences prefs = getApplicationContext().createDeviceProtectedStorageContext().getSharedPreferences("prefs", MODE_PRIVATE);            
+			if (!lock) CryptoManager.putInt(prefs, CryptoManager.BFU_ALIAS, "counter", dpm.getCurrentFailedPasswordAttempts());
         } catch (Throwable ignored) {} 
     }
 
@@ -115,6 +154,8 @@ public class MyAccessibilityService extends AccessibilityService {
 
 		if (PENDING_ADMIN_TO_START_FGS == 1) {
 			PENDING_ADMIN_TO_START_FGS = 0;
+			SharedPreferences p1 = getApplicationContext().createDeviceProtectedStorageContext().getSharedPreferences("prefs", MODE_PRIVATE);
+            lock = dpm.getCurrentFailedPasswordAttempts() > CryptoManager.getInt(p1, CryptoManager.BFU_ALIAS, "counter", 0);                         					
 			StartSilentKeepAlive();
 		}
         
