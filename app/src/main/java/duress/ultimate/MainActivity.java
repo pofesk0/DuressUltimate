@@ -1,6 +1,8 @@
 package duress.ultimate;
 
 import android.app.PendingIntent;
+import android.os.UserManager;
+import java.io.File;
 import android.content.pm.ApplicationInfo;
 import android.content.Intent;
 import android.content.pm.PackageInstaller;
@@ -10,7 +12,6 @@ import android.app.admin.DeviceAdminInfo;
 import android.app.Activity;
 import android.app.KeyguardManager;
 import android.content.Context;
-import android.os.UserManager;
 import android.app.admin.DevicePolicyManager;
 import android.content.ComponentName;
 import android.content.Intent;
@@ -150,15 +151,24 @@ public class MainActivity extends Activity {
     }
 
 	}
-
-
+		
 	private void showUsbWarningAlert() {
-    if (usbWarningDialog != null && usbWarningDialog.isShowing()) return;
+    if (usbWarningDialog != null && usbWarningDialog.isShowing()) return;	
 
-    String alertTitle = isEn() ? "Warning:" : "Предупреждение:";
-    String alertMsg = isEn() 
+    String alertTitle=null;
+	String alertMsg=null;
+		
+	if (new java.io.File("/product/app/VanadiumConfig").exists()) {
+	alertTitle = isEn() ? "Tips" : "Советы";
+    alertMsg = isEn() 
+		? "If you have GrapheneOS, disabling the USB port is much more effective in the exploit protection settings on your device."
+        : "Если у вас GrapheneOS, то отключать USB порт гораздо эффективнее в настройках exploit protection на вашем устройстве.";
+	} else {
+		alertTitle = isEn() ? "Warning:" : "Предупреждение:";
+        alertMsg = isEn() 
         ? "Disabling USB functions occurs at the operating system level and does not affect the low-level logic of the USB port, meaning it does not provide 100% protection.\nThis is just a step towards security.\nIf you want the ability to completely disable the USB port, it is better to use the GrapheneOS operating system."
         : "Отключение USB функций происходит на уровне операционной системы и не затрагивает низкоуровневую логику USB порта, тоесть не даёт 100-процентной защиты.\nЭто лишь шаг к безопасности.\nЕсли вы хотите возможность полного отключения USB порта, лучше использовать операционную систему GrapheneOS.";
+	}
 
     usbWarningDialog = new AlertDialog.Builder(this)
             .setTitle(alertTitle)
@@ -251,6 +261,7 @@ public class MainActivity extends Activity {
             finishAndRemoveTask();
 			return;
         }
+		
 		registerScreenOffReceiver();
         CryptoManager.initKeys();        
         requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -538,7 +549,7 @@ public class MainActivity extends Activity {
     if (isDO) {
 		
 		CheckBox cbUsbWipe = new CheckBox(this);
-		cbUsbWipe.setText(isEn() ? "Data, storage, and eSIM wipe on any USB state change, for example on charging from PC or second phone, on Type-C headphones or USB-keyboard connection. Typically, this does not affect charging from basic charging bricks" : "Сброс данных, хранилища и ESIM при любом изменении состояния USB, например при зарядке от ПК или второго телефона, подключении Type-C наушников или USB-клавиатуры. Обычно это не затрагивает зарядку от премитивных зарядных блоков");
+		cbUsbWipe.setText(isEn() ? "Data, storage, and eSIM wipe on any USB state change, for example on charging from PC or second phone, on Type-C headphones or USB-keyboard connection. Typically, this does not affect charging from basic charging bricks" : "Сброс данных, хранилища и eSIM при любом изменении состояния USB, например при зарядке от ПК или второго телефона, подключении Type-C наушников или USB-клавиатуры. Обычно это не затрагивает зарядку от премитивных зарядных блоков");
 		cbUsbWipe.setTextColor(Color.WHITE);
 		cbUsbWipe.setTextSize(16f);
 		if (isDO) { 
@@ -556,6 +567,27 @@ public class MainActivity extends Activity {
 			CryptoManager.putBoolean(p, CryptoManager.BFU_ALIAS, "usb_wipe", cbUsbWipe.isChecked());
 		});		
         buttonBox.addView(cbUsbWipe);
+
+		CheckBox cbBootWipe = new CheckBox(this);
+		cbBootWipe.setText(isEn() ? "Wipe data, storage and eSIM after reboot" : "Сброс данных, хранилища и eSIM после перезагрузки");
+		cbBootWipe.setTextColor(Color.WHITE);
+		cbBootWipe.setTextSize(16f);
+		if (isDO) {     
+			cbBootWipe.setChecked(CryptoManager.getBoolean(p, CryptoManager.BFU_ALIAS, "boot_wipe", false));
+		} else {    
+			cbBootWipe.setChecked(false); 
+			cbBootWipe.setAlpha(0.5f);
+		}
+		cbBootWipe.setOnClickListener(v -> { 
+    
+			if (!isDO) {   
+				cbBootWipe.setChecked(false);   
+				showDeviceOwnerInstruction();    
+				return;
+			} 
+			CryptoManager.putBoolean(p, CryptoManager.BFU_ALIAS, "boot_wipe", cbBootWipe.isChecked());
+		});		
+		buttonBox.addView(cbBootWipe);
 		
         Bundle restrictions = dpm.getUserRestrictions(adminName);
         boolean autofillDisabled = restrictions.getBoolean(UserManager.DISALLOW_AUTOFILL, false);
@@ -1400,13 +1432,20 @@ public class MainActivity extends Activity {
     final java.util.List<Boolean> initialStates = new java.util.ArrayList<>();
     final java.util.Map<String, CharSequence> labels = new java.util.HashMap<>();
 
-    hasUnsafeApps = false;	
+    java.util.Set<String> launchablePkgs = new java.util.HashSet<>();
+	for (android.content.pm.ResolveInfo ri : pm.queryIntentActivities(
+        new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
+        PackageManager.MATCH_DISABLED_COMPONENTS | PackageManager.MATCH_UNINSTALLED_PACKAGES)) {    
+		launchablePkgs.add(ri.activityInfo.packageName);
+	}
+		
+	hasUnsafeApps = false;	
 
 	backgroundThreadFree = false;	
 	new Thread(() -> {	
 	java.util.List<android.content.pm.ApplicationInfo> apps = pm.getInstalledApplications(PackageManager.MATCH_UNINSTALLED_PACKAGES | PackageManager.MATCH_DISABLED_COMPONENTS | PackageManager.MATCH_ALL | PackageManager.GET_META_DATA);
     java.util.Collections.sort(apps, (a, b) -> pm.getApplicationLabel(a).toString().compareToIgnoreCase(pm.getApplicationLabel(b).toString()));
-	
+				
 	for (android.content.pm.ApplicationInfo appInfo : apps) {
         if (appInfo.packageName.equals(getPackageName())) continue;
 
@@ -1414,7 +1453,7 @@ public class MainActivity extends Activity {
         boolean hasNoLogo = appInfo.icon == 0;
 		boolean isSettings = "com.android.settings".equals(appInfo.packageName);
 		boolean isSystemUid = appInfo.uid == android.os.Process.SYSTEM_UID;
-        boolean hasNoLaunchIntent = pm.getLaunchIntentForPackage(appInfo.packageName) == null;
+        boolean hasNoLaunchIntent = !launchablePkgs.contains(appInfo.packageName);
 		boolean isSystemApp = (appInfo.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) != 0;
         String defaultIme = Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD);
         boolean isIme = defaultIme != null && defaultIme.startsWith(appInfo.packageName + "/");
@@ -1552,8 +1591,8 @@ public class MainActivity extends Activity {
     } });
 	}
    
-    private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки (обычно попытка неверная попытка засчитывается если введено 4 или более символов).\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Не используйте другие типы блокировки, например графический ключ. Также не используйте разблокировку по биометрии и отключите агентов доверия в настройках безопасности вашего телефона.\n\nТакже важно сообщить что сброс по лимиту попыток не удаляет раздел FRP основного профиля, который хранит ID аккаунтов. Если хотите не оставлять следов от ваших Google аккаунтов, рекомендуется хранить их только в рабочих профилях, которые не могут быть завязаны на FRP. В остальных случаях будьте аккуратны и не привязывайте бекапы и важные данные к Google аккаунтам, также убедитесь что физического доступа к СИМ-карте недостаточно для получения контроля над ними, проще говоря не привязывайте Google аккаунты к номеру телефона. А ещё поставьте пин-код на сим-карту (это важно и для остальных данных вне зависимости от наличия FRP).\n\nЕсли предоставить этому приложению права Device Owner, оно отключит FRP.";
-	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded (typically, an incorrect attempt is counted if 4 or more characters are entered).\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Don't use other lock types, such as pattern locks. Also, don't use biometric unlock and please disable trust agents in your device security settings.\n\nIt is also important to inform that a reset by attempt limit does not delete the FRP section of the main profile, which stores account IDs. If you want not to leave traces of your Google accounts, it is recommended to store them only in work profiles, which cannot be linked to FRP. In other cases, be careful and do not link backups and important data to Google accounts, also make sure that physical access to the SIM card is not enough to gain control over them, simply put do not link Google accounts to a phone number. And also please set a PIN code for the SIM card (this is important also for the rest data regardless of the presence of FRP).\n\nIf you grant Device Owner rights to this app, it will disable FRP.";
+    private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки (обычно попытка неверная попытка засчитывается если введено 4 или более символов).\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Перед настройкой приложения убедитесь что у вас этот тип блокировки, отключите другие типы блокировки, например графический ключ (иначе вы просто случайно сотрёте данные). Также отключите разблокировку по биометрии и агентов доверия в настройках безопасности вашего телефона (ведь они обходят пароль).\n\nТакже важно сообщить что сброс по лимиту попыток не удаляет раздел FRP основного профиля, который хранит ID аккаунтов. Если хотите не оставлять следов от ваших Google аккаунтов, рекомендуется хранить их только в рабочих профилях, которые не могут быть завязаны на FRP. В остальных случаях будьте аккуратны и не привязывайте бекапы и важные данные к Google аккаунтам, также убедитесь что физического доступа к СИМ-карте недостаточно для получения контроля над ними, проще говоря не привязывайте Google аккаунты к номеру телефона. А ещё поставьте пин-код на сим-карту (это важно и для остальных данных вне зависимости от наличия FRP).\n\nЕсли предоставить этому приложению права Device Owner, оно отключит FRP.";
+	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded (typically, an incorrect attempt is counted if 4 or more characters are entered).\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Before setting up the app, make sure you have this lock type, disable other lock types, such as pattern locks (otherwise you will just accidentally erase the data). Also please disable biometric unlock and trust agents in your device security settings (bacause they bypass password).\n\nIt is also important to inform that a reset by attempt limit does not delete the FRP section of the main profile, which stores account IDs. If you want not to leave traces of your Google accounts, it is recommended to store them only in work profiles, which cannot be linked to FRP. In other cases, be careful and do not link backups and important data to Google accounts, also make sure that physical access to the SIM card is not enough to gain control over them, simply put do not link Google accounts to a phone number. And also please set a PIN code for the SIM card (this is important also for the rest data regardless of the presence of FRP).\n\nIf you grant Device Owner rights to this app, it will disable FRP.";
 	
     private static final String TEXT_ERROR = "Возникла ошибка:\nпамять приложения была очищена либо состояние пакета изменено некорректно";
     private static final String TEXT_ERROR_EN = "An error occurred:\nthe application data was cleared or the package state was modified incorrectly";
