@@ -68,6 +68,8 @@ public class MainActivity extends Activity {
 
 	private AlertDialog usbWarningDialog;
 
+	private static boolean WasRead=false;
+
 	private static final String SECRET_CODE_HASH = "secret_code_hash";
 
 	private static final String SECRET_CODE_SALT = "secret_code_salt";
@@ -151,12 +153,18 @@ public class MainActivity extends Activity {
     }
 
 	}
-		
+
 	private void showUsbWarningAlert() {
+		showUsbWarningAlert(true);
+	}
+		
+	private void showUsbWarningAlert(boolean i) {
     if (usbWarningDialog != null && usbWarningDialog.isShowing()) return;	
 
     String alertTitle=null;
 	String alertMsg=null;
+
+	if (i) {	
 		
 	if (new java.io.File("/product/app/VanadiumConfig").exists()) {
 	alertTitle = isEn() ? "Tips" : "Советы";
@@ -168,11 +176,19 @@ public class MainActivity extends Activity {
         alertMsg = isEn() 
         ? "Disabling USB functions occurs at the operating system level and does not affect the low-level logic of the USB port, meaning it does not provide 100% protection.\nThis is just a step towards security.\nIf you want the ability to completely disable the USB port, it is better to use the GrapheneOS operating system."
         : "Отключение USB функций происходит на уровне операционной системы и не затрагивает низкоуровневую логику USB порта, тоесть не даёт 100-процентной защиты.\nЭто лишь шаг к безопасности.\nЕсли вы хотите возможность полного отключения USB порта, лучше использовать операционную систему GrapheneOS.";
+	}} else {
+		if (WasRead) return;
+		WasRead=true;
+		alertTitle = isEn() ? "Warning:" : "Предупреждение:";
+        alertMsg = isEn() 
+        ? "Before starting the setup, make sure that your screen lock type is exactly a password, and not a PIN code, a pattern, or anything else. Otherwise, any mistake will lead to a data reset.\n\nAlso make sure that you have disabled biometric unlock and trust agents in your phone's security settings, because they can hinder the app in providing protection."
+		: "Перед началом настройки, убедитесь что ваш тип блокировки экрана это именно пароль, а не пин-код, графический ключ или что-либо ещё. В ином случае любая ошибка приведёт к сбросу данных.\n\nТакже убедитесь что у вас отключены разблокировка по биометрии и агенты доверия в настройках безопасности вашего телефона, ведь они могут мешать приложению осуществлять защиту.";
 	}
 
     usbWarningDialog = new AlertDialog.Builder(this)
             .setTitle(alertTitle)
             .setMessage(alertMsg)
+		    .setCancelable(false)
             .setPositiveButton("OK", (dialog, which) -> usbWarningDialog = null)
             .create();
 
@@ -387,6 +403,7 @@ public class MainActivity extends Activity {
         } 
 
         if (!hasDuressLen) {
+			showUsbWarningAlert(false);                
             render(isEn() ? TEXT_DURESS_LEN_EN : TEXT_DURESS_LEN);
             renderInputStep(isEn() ? "Save" : "Сохранить", 4, Integer.MAX_VALUE);
             return;
@@ -403,12 +420,12 @@ public class MainActivity extends Activity {
             renderButtons(isEn() ? new String[]{"Grant rights"} : new String[]{"Дать права"}, null, false);
             return;
         }
-        if (!accessibility) {            
+        if (!accessibility) {  			
             if (dialogShown) {
                 render(isEn() ? TEXT_RESTRICTED_EN : TEXT_RESTRICTED);
                 renderButtons(isEn() ? new String[]{"App Settings", "Accessibility Settings"} : new String[]{"Настройки приложения", "Настройки спецвозможностей"}, null, false);
             } else {
-                render(isEn() ? TEXT_ACCESSIBILITY_EN : TEXT_ACCESSIBILITY);
+				render(isEn() ? TEXT_ACCESSIBILITY_EN : TEXT_ACCESSIBILITY);
                 renderButtons(isEn() ? new String[]{"Enable Accessibility"} : new String[]{"Включить спецвозможности"}, null, false);
             }
             return;
@@ -1591,8 +1608,8 @@ public class MainActivity extends Activity {
     } });
 	}
    
-    private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки (обычно попытка неверная попытка засчитывается если введено 4 или более символов).\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Перед настройкой приложения убедитесь что у вас этот тип блокировки, отключите другие типы блокировки, например графический ключ (иначе вы просто случайно сотрёте данные). Также отключите разблокировку по биометрии и агентов доверия в настройках безопасности вашего телефона (ведь они обходят пароль).\n\nТакже важно сообщить что сброс по лимиту попыток не удаляет раздел FRP основного профиля, который хранит ID аккаунтов. Если хотите не оставлять следов от ваших Google аккаунтов, рекомендуется хранить их только в рабочих профилях, которые не могут быть завязаны на FRP. В остальных случаях будьте аккуратны и не привязывайте бекапы и важные данные к Google аккаунтам, также убедитесь что физического доступа к СИМ-карте недостаточно для получения контроля над ними, проще говоря не привязывайте Google аккаунты к номеру телефона. А ещё поставьте пин-код на сим-карту (это важно и для остальных данных вне зависимости от наличия FRP).\n\nЕсли предоставить этому приложению права Device Owner, оно отключит FRP.";
-	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded (typically, an incorrect attempt is counted if 4 or more characters are entered).\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Before setting up the app, make sure you have this lock type, disable other lock types, such as pattern locks (otherwise you will just accidentally erase the data). Also please disable biometric unlock and trust agents in your device security settings (bacause they bypass password).\n\nIt is also important to inform that a reset by attempt limit does not delete the FRP section of the main profile, which stores account IDs. If you want not to leave traces of your Google accounts, it is recommended to store them only in work profiles, which cannot be linked to FRP. In other cases, be careful and do not link backups and important data to Google accounts, also make sure that physical access to the SIM card is not enough to gain control over them, simply put do not link Google accounts to a phone number. And also please set a PIN code for the SIM card (this is important also for the rest data regardless of the presence of FRP).\n\nIf you grant Device Owner rights to this app, it will disable FRP.";
+    private static final String TEXT_INTRO = "Привет! Это приложение, которое сбрасывает телефон до заводких настроек и удаляет данные при вводе пароля блокировки экрана заданной длины для сброса или при превышении лимита неверных попыток разблокировки (обычно попытка неверная попытка засчитывается если введено 4 или более символов).\n\nКак это работает:\n Вы задаете длину пароля для сброса и максимальное количество неверных попыток (от 1 до 5). По умолчанию когда приложение только получило свои права (спецвозможности и админ) лимит неверных попыток держится на уровне 1. При вводе пароля обычной длины сервис спецвозможностей временно добавляет 2 попытки (вплоть до максимального лимита). При вводе длины для сброса, лимит остается равным 1 и если вы ввели неверный пароль, происходит сброс. Длина для сброса должна отличаться от длины вашего пароля. Приложение использует такую сложную тактику с выставлением лимитов чтобы минимизировать временное окно, когда защиту можно обойти. Проще говоря, при сбое в системе или случайной остановке сервиса спецвозможностей, с наибольшей вероятностью лимит будет оставаться равен 1му или 1му от текущего количества неверных попыток, оставляя защиту в силе.\n\nРекомендация: приложение поддерживает только один тип блокировки: Пароль. Перед настройкой приложения убедитесь что у вас этот тип блокировки, отключите другие типы блокировки, например графический ключ (иначе любая ошибка приведёт к сбросу данных). Также отключите разблокировку по биометрии и агентов доверия в настройках безопасности вашего телефона (ведь они могут мешать приложению осуществлять защиту).\n\nТакже важно сообщить что сброс по лимиту попыток не удаляет раздел FRP основного профиля, который хранит ID аккаунтов. Если хотите не оставлять следов от ваших Google аккаунтов, рекомендуется хранить их только в рабочих профилях, которые не могут быть завязаны на FRP. В остальных случаях будьте аккуратны и не привязывайте бекапы и важные данные к Google аккаунтам, также убедитесь что физического доступа к СИМ-карте недостаточно для получения контроля над ними, проще говоря не привязывайте Google аккаунты к номеру телефона. А ещё поставьте пин-код на сим-карту (это важно и для остальных данных вне зависимости от наличия FRP).\n\nЕсли предоставить этому приложению права Device Owner, оно отключит FRP.";
+	private static final String TEXT_INTRO_EN = "Hello! This is an app that performs a factory reset and wipes all data when a screen lock password of the specified length for reset is entered or when the limit of failed unlock attempts is exceeded (typically, an incorrect attempt is counted if 4 or more characters are entered).\n\nHow it works:\n You set the password length for reset and the maximum number of failed attempts (1 to 5). By default, when the app has just received its permissions (accessibility and admin), the failed attempt limit is kept at 1. When entering a regular-length password, the accessibility service temporarily adds 2 attempts (up to the maximum limit). When entering the length for reset, the limit remains at 1, and if you enter an incorrect password, a reset occurs. The length for reset must differ from your actual password length. The app uses this complex limit-setting tactic to minimize the time window when protection could be bypassed. Simply put, during a system crash or accidental stoppage of the accessibility service, the limit is most likely to remain equal to 1 or 1 relative to the current number of failed attempts, keeping the protection active.\n\nRecommendation: The app supports only one lock type: Password. Before setting up the app, make sure you have this lock type, disable other lock types, such as pattern locks (otherwise any mistake will lead to a data reset). Also please disable biometric unlock and trust agents in your device security settings (because they can hinder the app in providing protection).\n\nIt is also important to inform that a reset by attempt limit does not delete the FRP section of the main profile, which stores account IDs. If you want not to leave traces of your Google accounts, it is recommended to store them only in work profiles, which cannot be linked to FRP. In other cases, be careful and do not link backups and important data to Google accounts, also make sure that physical access to the SIM card is not enough to gain control over them, simply put do not link Google accounts to a phone number. And also please set a PIN code for the SIM card (this is important also for the rest data regardless of the presence of FRP).\n\nIf you grant Device Owner rights to this app, it will disable FRP.";
 	
     private static final String TEXT_ERROR = "Возникла ошибка:\nпамять приложения была очищена либо состояние пакета изменено некорректно";
     private static final String TEXT_ERROR_EN = "An error occurred:\nthe application data was cleared or the package state was modified incorrectly";
