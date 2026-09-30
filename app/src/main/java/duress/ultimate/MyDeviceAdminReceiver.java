@@ -1,6 +1,7 @@
 package duress.ultimate;
 
 import java.util.Collections;
+import android.content.SharedPreferences;
 import android.app.admin.DevicePolicyManager;
 import android.app.admin.DeviceAdminReceiver;
 import android.content.ComponentName;
@@ -19,7 +20,7 @@ public class MyDeviceAdminReceiver extends DeviceAdminReceiver {
     static void disableFRP(Context context) {
            try {
            DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
-           if (!dpm.isDeviceOwnerApp(context.getPackageName())) return;
+           if (dpm==null || !dpm.isDeviceOwnerApp(context.getPackageName())) return;
            ComponentName admin = new ComponentName(context, MyDeviceAdminReceiver.class);
 
            if (android.os.Build.VERSION.SDK_INT >= 30) {
@@ -42,6 +43,20 @@ public class MyDeviceAdminReceiver extends DeviceAdminReceiver {
            
            } catch (Throwable t) {}
    }
+
+        
+   static void is_disabled(Context context) {
+       DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(Context.DEVICE_POLICY_SERVICE);
+       if (dpm==null || !dpm.isDeviceOwnerApp(context.getPackageName())) return;              
+       Context c = context.getApplicationContext().createDeviceProtectedStorageContext();      
+       SharedPreferences prefs = c.getSharedPreferences("prefs", Context.MODE_PRIVATE);    
+       boolean isDisabled = prefs.getBoolean("disabled", false);   
+       if (!isDisabled) {  
+           disableFRP(context);     
+           prefs.edit().putBoolean("disabled", true).apply();   
+       } 
+   }
+
         
     @Override
     public void onEnabled(Context context, Intent intent) {         
