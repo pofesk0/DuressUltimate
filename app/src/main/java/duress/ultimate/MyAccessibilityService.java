@@ -142,6 +142,8 @@ public class MyAccessibilityService extends AccessibilityService {
 				MyDeviceAdminReceiver.disableFRP(this);
 				PENDING_OWNER=false;
 			}
+		} else {
+			MyDeviceAdminReceiver.is_disabled(this);
 		}
 		
 		if (dpm == null || !dpm.isAdminActive(new ComponentName(this, MyDeviceAdminReceiver.class))) {					
